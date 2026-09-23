@@ -487,12 +487,29 @@ main { position:relative; z-index:1; }
   background: #f7fdf6;
   overflow: hidden;
 }
+.demo-canvas-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: #f7fdf6;
+}
 .demo-canvas {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   display: block;
   opacity: 1;
 }
+.demo-fallback {
+  display: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.demo-body.is-static .demo-canvas { display: none; }
+.demo-body.is-static .demo-fallback { display: block; }
 .demo-caption {
   position: absolute;
   top: 0.75rem;
@@ -1979,29 +1996,45 @@ main { position:relative; z-index:1; }
   .sidebar-row-2 { grid-template-columns: 1fr 1fr; }
   .ls-inner { padding: 2.1rem 0; }
 
-  /* En tablet/móvil: no solapar tabla sobre el gráfico */
+  /* Móvil/tablet: gráfico arriba + tabla abajo, sin solaparse ni crecer sin control */
   .demo-body {
     min-height: 0;
+    height: auto;
     display: flex;
     flex-direction: column;
+    overflow: visible;
   }
-  .demo-canvas {
+  .demo-canvas-wrap {
     position: relative;
     inset: auto;
     width: 100%;
-    height: 180px;
+    height: 160px;
     flex-shrink: 0;
+  }
+  .demo-canvas,
+  .demo-fallback {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .demo-caption {
+    top: .4rem;
+    left: .5rem;
+    font-size: .58rem;
+    padding: .2rem .45rem;
   }
   .demo-overlay-cards {
     position: relative;
     inset: auto;
-    padding: .65rem .75rem .8rem;
+    padding: .55rem .65rem .7rem;
     background: var(--s1);
     border-top: 1px solid var(--b0);
   }
   .demo-overlay-cards .hero-table-card {
     position: static;
     width: 100%;
+    max-width: none;
     right: auto;
     bottom: auto;
     animation: none;
@@ -2012,6 +2045,14 @@ main { position:relative; z-index:1; }
     background: var(--s0);
   }
   .demo-float-b { animation: none; }
+  .hero-mini-table { font-size: .72rem; overflow-x: auto; }
+  .hero-mini-table table { width: 100%; min-width: 0; }
+  .hero-mini-table th,
+  .hero-mini-table td { padding: .28rem .25rem; font-size: .7rem; }
+  .hero-table-tags { flex-wrap: wrap; gap: .35rem; }
+  .htag { font-size: .65rem; }
+  .hero-copy::before { display: none; }
+  .hero-shell { padding: 1.5rem 0 1.75rem; gap: 1.25rem; }
 }
 
 @media (max-width: 760px) {
@@ -2104,50 +2145,10 @@ main { position:relative; z-index:1; }
     max-width: 100%;
   }
 
-  /* Vista previa: gráfico arriba, tabla abajo (sin solaparse) */
-  .demo-body {
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
-  .demo-canvas {
-    position: relative;
-    inset: auto;
-    width: 100%;
-    height: 150px;
-    flex-shrink: 0;
-  }
-  .demo-caption {
-    top: .45rem;
-    left: .5rem;
-    font-size: .58rem;
-    padding: .22rem .45rem;
-  }
-  .demo-overlay-cards {
-    position: relative;
-    inset: auto;
-    padding: .55rem .65rem .7rem;
-    background: var(--s1);
-    border-top: 1px solid var(--b0);
-  }
-  .demo-overlay-cards .hero-table-card {
-    position: static;
-    width: 100%;
-    right: auto;
-    bottom: auto;
-    animation: none;
-    transform: none;
-    box-shadow: none;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    background: var(--s0);
-  }
-  .demo-float-b { animation: none; }
-  .hero-mini-table { font-size: .72rem; }
+  .demo-canvas-wrap { height: 140px; }
   .hero-mini-table th,
-  .hero-mini-table td { padding: .28rem .3rem; }
-  .hero-table-tags { flex-wrap: wrap; gap: .35rem; }
-  .htag { font-size: .68rem; }
+  .hero-mini-table td { padding: .25rem .2rem; font-size: .68rem; }
+  .htag { font-size: .65rem; }
 
   .footer-inner { padding: 1.1rem 0 .95rem; }
   .footer-brand { flex-direction: row; gap: .65rem; align-items: center; }
@@ -2187,7 +2188,7 @@ main { position:relative; z-index:1; }
   }
   .hstat-n { font-size: 1.25rem; }
   .hstat-l { font-size: .52rem; letter-spacing: .03em; }
-  .demo-canvas { height: 130px; }
+  .demo-canvas-wrap { height: 120px; }
   .coef-input { font-size: .82rem; }
   .var-letter { font-size: 2.1rem; }
   .howto-grid,
@@ -2410,8 +2411,11 @@ main { position:relative; z-index:1; }
     transform: none !important;
     transition: none !important;
   }
-  .hero-canvas,
-  .demo-canvas { display: none; }
+  .hero-canvas { display: none; }
+  /* Demo: usar dibujo SVG estático en lugar de canvas animado */
+  .demo-body { /* keep visible */ }
+  .demo-canvas { display: none !important; }
+  .demo-fallback { display: block !important; }
   /* Blobs siguen visibles aunque no se muevan */
   .amb-blob-a { opacity: 0.9; }
   .amb-blob-b { opacity: 0.7; }

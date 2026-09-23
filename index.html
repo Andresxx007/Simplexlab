@@ -119,8 +119,20 @@
                 <span class="demo-title">SimplexLab · vista previa</span>
               </div>
               <div class="demo-body">
-                <canvas id="demo-canvas" class="demo-canvas" aria-hidden="true"></canvas>
-                <p class="demo-caption">Camino Simplex · región factible</p>
+                <div class="demo-canvas-wrap">
+                  <canvas id="demo-canvas" class="demo-canvas" aria-hidden="true"></canvas>
+                  <!-- Fallback estático si el canvas no corre (motion reducido / error) -->
+                  <svg class="demo-fallback" viewBox="0 0 320 180" aria-hidden="true">
+                    <rect width="320" height="180" fill="#f7fdf6"/>
+                    <polygon points="40,150 40,40 140,70 250,150" fill="rgba(78,166,116,0.35)" stroke="#023337" stroke-width="2"/>
+                    <line x1="40" y1="150" x2="40" y2="24" stroke="#5a9a72" stroke-width="1.5"/>
+                    <line x1="24" y1="150" x2="290" y2="150" stroke="#5a9a72" stroke-width="1.5"/>
+                    <polyline points="40,150 40,40 140,70" fill="none" stroke="#1a6b75" stroke-width="2.5" stroke-dasharray="6 4"/>
+                    <circle cx="140" cy="70" r="7" fill="#023337"/>
+                    <circle cx="140" cy="70" r="3" fill="#e9f8e7"/>
+                  </svg>
+                  <p class="demo-caption">Camino Simplex · región factible</p>
+                </div>
                 <div class="demo-overlay-cards">
                   <div class="hero-table-card card-beam demo-float-b">
                     <p class="hero-card-label">Tabla Simplex · pivote</p>

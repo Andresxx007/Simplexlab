@@ -112,7 +112,14 @@ export function startHeroCanvas(canvas) {
 
 /** Demo dentro del marco (camino Simplex animado) */
 export function startDemoCanvas(canvas) {
-  if (!canvas || prefersReducedMotion()) return () => {};
+  if (!canvas) return () => {};
+  const body = canvas.closest('.demo-body');
+  if (prefersReducedMotion()) {
+    if (body) body.classList.add('is-static');
+    return () => {};
+  }
+  if (body) body.classList.remove('is-static');
+
   const ctx = canvas.getContext('2d');
   let raf = 0;
   let w = 0;
@@ -128,16 +135,17 @@ export function startDemoCanvas(canvas) {
   const path = [verts[0], verts[1], verts[2]];
 
   const resize = () => {
-    const parent = canvas.parentElement;
-    if (!parent) return;
-    const rect = parent.getBoundingClientRect();
+    // El wrap fija el alto; no usar el body completo (evita crecer sin control en móvil)
+    const box = canvas.parentElement;
+    if (!box) return;
+    const rect = box.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     w = Math.max(1, Math.floor(rect.width));
     h = Math.max(1, Math.floor(rect.height));
     canvas.width = Math.floor(w * dpr);
     canvas.height = Math.floor(h * dpr);
-    canvas.style.width = `${w}px`;
-    canvas.style.height = `${h}px`;
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   };
 
