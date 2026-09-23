@@ -7,25 +7,52 @@ import { varName } from './engine.js';
 const STATUS_COPY = {
   optimal: {
     title: 'Solución óptima',
-    body: 'Se encontró una solución factible que optimiza la función objetivo.',
+    body: 'Se encontró una solución factible que optimiza la función objetivo. Todas las restricciones se cumplen y Z ya no puede mejorar.',
   },
   unbounded: {
     title: 'Problema no acotado',
-    body: 'La función objetivo puede mejorar indefinidamente dentro de la región factible.',
+    body: 'La función objetivo puede mejorar indefinidamente. Suele ocurrir si falta alguna restricción que limite el crecimiento de Z, o si el sentido (Max/Min) no coincide con las desigualdades.',
   },
   infeasible: {
     title: 'Problema infactible',
-    body: 'No existe ningún punto que cumpla todas las restricciones a la vez.',
+    body: 'No existe ningún punto X ≥ 0 que cumpla todas las restricciones a la vez. Revise igualdades o desigualdades que se contradigan entre sí (por ejemplo dos = incompatibles, o un ≥ que choque con un ≤).',
   },
   alternate: {
     title: 'Óptimos alternativos',
-    body: 'Hay más de una solución óptima. El valor de Z es el mismo en todas ellas.',
+    body: 'Hay más de una solución óptima básica. El valor de Z es el mismo; cualquier combinación convexa entre ellas también es óptima.',
   },
   continue: {
     title: 'En proceso',
     body: 'El algoritmo aún no ha terminado.',
   },
 };
+
+/** Consejos didácticos según el resultado final */
+export function resultAdvice(status) {
+  if (status === 'infeasible') {
+    return [
+      'Compruebe que no haya dos igualdades (=) que no puedan cumplirse juntas.',
+      'Un ≥ muy exigente junto a un ≤ muy estricto suele vaciar la región factible.',
+      'El Simplex lo detecta cuando una variable artificial queda positiva al final (método M grande).',
+      'Use el ejemplo «Infactible» en Ejemplos para ver un caso controlado: X₁+X₂ ≤ 2 y X₁+X₂ ≥ 5.',
+    ];
+  }
+  if (status === 'unbounded') {
+    return [
+      'Agregue restricciones que acoten las variables (recursos, demandas, límites superiores).',
+      'Verifique Max/Min: maximizar sin techo en una dirección libre produce no acotado.',
+      'Si esperaba óptimo, revise signos de coeficientes y operadores ≤ / ≥.',
+    ];
+  }
+  if (status === 'optimal' || status === 'alternate') {
+    return [
+      'En Verificación, «Activa» significa LHS = RHS (recurso agotado o igualdad exacta).',
+      '«Holgada» significa que la restricción se cumple con holgura (sobra recurso).',
+      'Los precios sombra solo tienen sentido en una solución óptima factible.',
+    ];
+  }
+  return [];
+}
 
 export function statusCopy(status) {
   return STATUS_COPY[status] || STATUS_COPY.continue;
@@ -45,6 +72,10 @@ export function explainStep(step, index, total) {
   } else if (step.entering && step.status === 'unbounded') {
     parts.push(
       `${step.entering} mejora Z, pero no hay fila con coeficiente positivo: el problema no está acotado.`
+    );
+  } else if (step.status === 'infeasible') {
+    parts.push(
+      'El procedimiento termina sin solución factible: alguna variable artificial permanece positiva o no se pudo expulsar de la base.'
     );
   }
 
@@ -86,24 +117,32 @@ export function explainSolution(result, displayMode = 'fraction') {
     result.values.forEach((v, i) => {
       lines.push(`${varName('X', i + 1)} = ${fmt(v)}`);
     });
-  }
 
-  if (result.slacks && Object.keys(result.slacks).length) {
-    Object.entries(result.slacks).forEach(([name, val]) => {
-      if (val.isZero()) {
-        lines.push(`${name} = 0 → el recurso asociado se agota (restricción activa).`);
-      } else {
-        lines.push(`${name} = ${fmt(val)} → sobra ese recurso.`);
-      }
-    });
-  }
+    if (result.slacks && Object.keys(result.slacks).length) {
+      Object.entries(result.slacks).forEach(([name, val]) => {
+        if (val.isZero()) {
+          lines.push(`${name} = 0 → el recurso asociado se agota (restricción activa).`);
+        } else {
+          lines.push(`${name} = ${fmt(val)} → sobra ese recurso.`);
+        }
+      });
+    }
 
-  if (result.shadowPrices && Object.keys(result.shadowPrices).length) {
-    Object.entries(result.shadowPrices).forEach(([name, val]) => {
-      lines.push(
-        `Precio sombra de ${name}: ${fmt(val)} → cuánto mejora Z por cada unidad extra de ese recurso (en el entorno local).`
-      );
-    });
+    if (result.shadowPrices && Object.keys(result.shadowPrices).length) {
+      Object.entries(result.shadowPrices).forEach(([name, val]) => {
+        lines.push(
+          `Precio sombra de ${name}: ${fmt(val)} → cuánto mejora Z por cada unidad extra de ese recurso (en el entorno local).`
+        );
+      });
+    }
+  } else if (result.status === 'infeasible') {
+    lines.push('El problema es infactible: no existe X ≥ 0 que cumpla todas las restricciones.');
+    const bad = (result.verification || []).filter((v) => !v.satisfied);
+    if (bad.length) {
+      lines.push(`Restricciones que no se cumplen en el diagnóstico: ${bad.map((v) => `R${v.index}`).join(', ')}.`);
+    }
+  } else if (result.status === 'unbounded') {
+    lines.push('El problema no está acotado: Z puede mejorar sin límite.');
   }
 
   return lines;

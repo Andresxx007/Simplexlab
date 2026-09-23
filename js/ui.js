@@ -4,7 +4,7 @@
 
 import { solve, varName } from './engine.js';
 import { validateProblem } from './validator.js';
-import { explainStep, statusCopy, GLOSSARY } from './explainer.js';
+import { explainStep, statusCopy, resultAdvice, GLOSSARY } from './explainer.js';
 import { EXAMPLES } from './examples.js';
 import {
   loadHistory, saveHistoryItem, removeHistoryItem, clearHistory, storageAvailable,
@@ -293,17 +293,9 @@ export class AppUI {
     const root = $('#problem-form');
     root.innerHTML = '';
 
-    // Default values for first load
-    const defObj = ['3', '5'];
-    const defCons = [
-      { coeffs: ['1', '0'], op: '<=', rhs: '4' },
-      { coeffs: ['0', '2'], op: '<=', rhs: '12' },
-      { coeffs: ['3', '2'], op: '<=', rhs: '18' },
-    ];
-
     const sense = this.state.sense;
 
-    // Objective row
+    // Objective row — vacíos por defecto (el validador toma '' como 0)
     const objRow = el('div', { className: 'obj-row' });
     const badgeLabel = sense === 'min' ? 'Minimizar Z =' : 'Maximizar Z =';
     objRow.append(el('div', { className: 'row-badge', text: badgeLabel }));
@@ -317,10 +309,11 @@ export class AppUI {
         inputmode: 'decimal',
         autocomplete: 'off',
         className: 'coef-input',
+        placeholder: '',
         'aria-label': `Coef. X${j + 1} función objetivo`,
       });
-      inp.value = prev ? (prev.objective[j] ?? '') : (defObj[j] ?? '');
-      inp.addEventListener('input', () => this.updatePreview());
+      inp.value = prev ? (prev.objective[j] ?? '') : '';
+      this.wireCoefInput(inp);
       field.append(inp);
       objRow.append(field);
     }
@@ -340,13 +333,11 @@ export class AppUI {
           inputmode: 'decimal',
           autocomplete: 'off',
           className: 'coef-input',
+          placeholder: '',
           'aria-label': `R${i + 1} coef X${j + 1}`,
         });
-        const defV = prev
-          ? (prev.constraints[i]?.coeffs[j] ?? '')
-          : (defCons[i]?.coeffs[j] ?? '');
-        inp.value = defV;
-        inp.addEventListener('input', () => this.updatePreview());
+        inp.value = prev ? (prev.constraints[i]?.coeffs[j] ?? '') : '';
+        this.wireCoefInput(inp);
         field.append(inp);
         row.append(field);
       }
@@ -360,7 +351,7 @@ export class AppUI {
         const o = el('option', { value: v, text: lbl });
         op.append(o);
       });
-      op.value = prev ? (prev.constraints[i]?.op || '<=') : (defCons[i]?.op || '<=');
+      op.value = prev ? (prev.constraints[i]?.op || '<=') : '<=';
       op.addEventListener('change', () => this.updatePreview());
       row.append(op);
 
@@ -372,10 +363,11 @@ export class AppUI {
         inputmode: 'decimal',
         autocomplete: 'off',
         className: 'coef-input',
+        placeholder: '',
         'aria-label': `Lado derecho R${i + 1}`,
       });
-      rhs.value = prev ? (prev.constraints[i]?.rhs ?? '') : (defCons[i]?.rhs ?? '');
-      rhs.addEventListener('input', () => this.updatePreview());
+      rhs.value = prev ? (prev.constraints[i]?.rhs ?? '') : '';
+      this.wireCoefInput(rhs);
       rhsField.append(rhs);
       row.append(rhsField);
 
@@ -386,20 +378,48 @@ export class AppUI {
     this.updatePreview();
   }
 
+  /** Comportamiento de inputs de coeficiente: no rellenar con 0; al enfocar un 0, seleccionarlo. */
+  wireCoefInput(inp) {
+    inp.addEventListener('input', () => this.updatePreview());
+    inp.addEventListener('focus', () => {
+      const v = inp.value.trim();
+      if (v === '0' || v === '0.0' || v === '0,0') {
+        requestAnimationFrame(() => inp.select());
+      }
+    });
+    // Si el usuario escribe encima de un 0 seleccionado, se reemplaza solo.
+    // Si pega o escribe al final de "0", limpiar el cero residual al primer dígito.
+    inp.addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const isDigit = e.key.length === 1 && /[0-9.\-,/]/.test(e.key);
+      if (!isDigit) return;
+      const v = inp.value.trim();
+      const selAll = inp.selectionStart === 0 && inp.selectionEnd === inp.value.length;
+      if ((v === '0' || v === '0.0' || v === '0,0') && !selAll && inp.selectionStart === v.length) {
+        // Cursor al final de un 0 suelto → reemplazar en vez de concatenar (p. ej. 05)
+        if (e.key !== '.' && e.key !== ',' && e.key !== '-' && e.key !== '/') {
+          e.preventDefault();
+          inp.value = e.key;
+          inp.setSelectionRange(1, 1);
+          this.updatePreview();
+        }
+      }
+    });
+  }
+
   collectRaw() {
     const objective = [];
     for (let j = 0; j < this.state.numVars; j++) {
       const inp = document.getElementById(`obj-${j}`);
-      if (inp && inp.value.trim() === '') inp.value = '0';
-      objective.push(inp?.value.trim() ?? '0');
+      // Vacío se deja vacío en pantalla; el validador lo trata como 0
+      objective.push(inp?.value.trim() ?? '');
     }
     const constraints = [];
     for (let i = 0; i < this.state.numCons; i++) {
       const coeffs = [];
       for (let j = 0; j < this.state.numVars; j++) {
         const inp = document.getElementById(`con-${i}-${j}`);
-        if (inp && inp.value.trim() === '') inp.value = '0';
-        coeffs.push(inp?.value.trim() ?? '0');
+        coeffs.push(inp?.value.trim() ?? '');
       }
       constraints.push({
         coeffs,
@@ -413,7 +433,7 @@ export class AppUI {
   updatePreview() {
     const raw = this.collectRaw();
     const terms = (coeffs) => coeffs
-      .map((c, j) => `${c || '0'}X${SUB[j + 1]}`)
+      .map((c, j) => `${c === '' || c == null ? '0' : c}X${SUB[j + 1]}`)
       .join(' + ')
       .replace(/\+ -/g, '− ');
 
@@ -449,7 +469,6 @@ export class AppUI {
     this.state.numVars = 2;
     this.state.numCons = 3;
     this.state.sense = 'max';
-    // Reset toggles
     document.querySelectorAll('#sense-toggle .toggle-opt').forEach((b) => {
       const active = b.dataset.val === 'max';
       b.classList.toggle('is-active', active);
@@ -457,16 +476,9 @@ export class AppUI {
     });
     $('#sense').value = 'max';
     this.buildForm(false);
-    for (let j = 0; j < 2; j++) { const i = document.getElementById(`obj-${j}`); if (i) i.value = ''; }
-    for (let i = 0; i < 3; i++) {
-      for (let j = 0; j < 2; j++) { const inp = document.getElementById(`con-${i}-${j}`); if (inp) inp.value = ''; }
-      const rhs = document.getElementById(`rhs-${i}`); if (rhs) rhs.value = '';
-      const op = document.getElementById(`op-${i}`); if (op) op.value = '<=';
-    }
     $('#results').classList.add('is-hidden');
     this.state.result = null;
     this.showMessages([]);
-    this.updatePreview();
   }
 
   loadProblem(problem) {
@@ -576,6 +588,16 @@ export class AppUI {
     banner.append(icon, textDiv);
     root.append(banner);
 
+    const tips = resultAdvice(result.status);
+    if (tips.length) {
+      const tipBox = el('div', { className: `result-advice advice-${result.status}` });
+      tipBox.append(el('p', { className: 'result-advice-title', text: 'Qué revisar / cómo interpretarlo' }));
+      const tipList = el('ul', { className: 'result-advice-list' });
+      tips.forEach((t) => tipList.append(el('li', { text: t })));
+      tipBox.append(tipList);
+      root.append(tipBox);
+    }
+
     // Mode tabs
     const tabs = el('div', { className: 'mode-tabs' });
     [['auto', 'Resultado final'], ['step', 'Paso a paso'], ['full', 'Procedimiento completo']].forEach(([id, label]) => {
@@ -601,25 +623,33 @@ export class AppUI {
 
   renderAuto(root, result) {
     const grid = el('div', { className: 'results-grid' });
+    const isSolved = result.status === 'optimal' || result.status === 'alternate';
 
-    // Left: solution details
     const left = el('div', { className: 'result-card' });
-    left.append(el('h3', { text: 'Valores óptimos' }));
+    left.append(el('h3', { text: isSolved ? 'Valores óptimos' : 'Resumen del resultado' }));
 
     const ul = el('ul', { className: 'solution-list' });
-    if (result.status === 'optimal' || result.status === 'alternate') {
+    if (isSolved) {
       result.values.forEach((v, i) => {
         const li = el('li');
         li.append(el('span', { text: varName('X', i + 1) }));
         li.append(el('span', { className: 'key-val', text: this.fmt(v) }));
         ul.append(li);
       });
+    } else if (result.status === 'infeasible') {
+      ul.append(el('li', {
+        text: 'No hay punto factible: las restricciones se contradicen. No se reportan Xⱼ ni Z óptimos.',
+      }));
+    } else if (result.status === 'unbounded') {
+      ul.append(el('li', {
+        text: 'Z puede crecer (o decrecer) sin límite. No hay óptimo finito que reportar.',
+      }));
     } else {
       ul.append(el('li', { text: 'No hay solución óptima que reportar.' }));
     }
     left.append(ul);
 
-    if (result.slacks && Object.keys(result.slacks).length > 0) {
+    if (isSolved && result.slacks && Object.keys(result.slacks).length > 0) {
       left.append(el('h3', { text: 'Holguras y excesos', className: 'subhead' }));
       const ulS = el('ul', { className: 'solution-list' });
       Object.entries(result.slacks).forEach(([name, val]) => {
@@ -631,10 +661,18 @@ export class AppUI {
         }));
         ulS.append(li);
       });
+      if (result.excesses && Object.keys(result.excesses).length > 0) {
+        Object.entries(result.excesses).forEach(([name, val]) => {
+          const li = el('li');
+          li.append(el('span', { text: name }));
+          li.append(el('span', { className: 'key-val', text: this.fmt(val) }));
+          ulS.append(li);
+        });
+      }
       left.append(ulS);
     }
 
-    if (result.shadowPrices && Object.keys(result.shadowPrices).length > 0) {
+    if (isSolved && result.shadowPrices && Object.keys(result.shadowPrices).length > 0) {
       left.append(el('h3', { text: 'Precios sombra', className: 'subhead' }));
       const ulP = el('ul', { className: 'solution-list' });
       Object.entries(result.shadowPrices).forEach(([name, val]) => {
@@ -659,7 +697,35 @@ export class AppUI {
     }
 
     if (result.verification?.length) {
-      left.append(el('h3', { text: 'Verificación de restricciones', className: 'subhead' }));
+      left.append(el('h3', {
+        text: isSolved ? 'Verificación de restricciones' : 'Diagnóstico de restricciones',
+        className: 'subhead',
+      }));
+
+      if (!isSolved) {
+        left.append(el('p', {
+          className: 'verify-note',
+          text: 'Se evalúan las restricciones originales en el último punto de la tabla (aún no factible). «Incumplida» señala el conflicto.',
+        }));
+      }
+
+      const violated = result.verification.filter((v) => !v.satisfied);
+      if (violated.length && result.status === 'infeasible') {
+        const diag = el('div', { className: 'verify-conflict' });
+        diag.append(el('p', {
+          className: 'verify-conflict-title',
+          text: `${violated.length} restricción(es) en conflicto:`,
+        }));
+        const dList = el('ul');
+        violated.forEach((v) => {
+          dList.append(el('li', {
+            text: `R${v.index}: LHS = ${this.fmt(v.lhs)}  ${opSymbol(v.op)}  ${this.fmt(v.rhs)}  → no se cumple`,
+          }));
+        });
+        diag.append(dList);
+        left.append(diag);
+      }
+
       const vt = el('table', { className: 'ratio-table' });
       vt.append(el('thead', {}, [
         el('tr', {}, [
@@ -670,12 +736,26 @@ export class AppUI {
       ]));
       const tb = el('tbody');
       result.verification.forEach((v) => {
-        tb.append(el('tr', {}, [
+        let estado;
+        let estadoClass;
+        if (!v.satisfied) {
+          estado = '✗ Incumplida';
+          estadoClass = 'estado-bad';
+        } else if (v.active) {
+          estado = '● Activa';
+          estadoClass = 'estado-active';
+        } else {
+          estado = '○ Holgada';
+          estadoClass = 'estado-ok';
+        }
+        tb.append(el('tr', {
+          className: v.satisfied ? '' : 'is-violated',
+        }, [
           el('td', { text: String(v.index) }),
           el('td', { text: this.fmt(v.lhs) }),
           el('td', { text: opSymbol(v.op) }),
           el('td', { text: this.fmt(v.rhs) }),
-          el('td', { text: v.active ? '● Activa' : v.satisfied ? '○ Holgada' : '✗ Incumplida' }),
+          el('td', { className: estadoClass, text: estado }),
         ]));
       });
       vt.append(tb);
@@ -691,7 +771,6 @@ export class AppUI {
     root.append(grid);
     this.drawGraph(gwrap, result);
 
-    // CTA to step mode
     const cta = el('div', { style: 'margin-top:1.25rem; display:flex; gap:.6rem; flex-wrap:wrap;' });
     cta.append(
       el('button', {

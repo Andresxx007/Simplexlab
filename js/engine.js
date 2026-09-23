@@ -369,13 +369,14 @@ function verifyConstraints(constraintsOriginal, values) {
     let active = false;
     if (con.op === '<=') {
       satisfied = lhs.lte(con.rhs);
-      active = lhs.equals(con.rhs);
+      active = satisfied && lhs.equals(con.rhs);
     } else if (con.op === '>=') {
       satisfied = lhs.gte(con.rhs);
-      active = lhs.equals(con.rhs);
+      active = satisfied && lhs.equals(con.rhs);
     } else {
+      // Igualdad: solo está «activa» (y cumplida) si LHS = RHS
       satisfied = lhs.equals(con.rhs);
-      active = true;
+      active = satisfied;
     }
     return { index: i + 1, lhs, rhs: con.rhs, op: con.op, satisfied, active };
   });
