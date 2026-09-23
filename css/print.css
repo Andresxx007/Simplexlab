@@ -1,0 +1,72 @@
+/* ══ SimplexLab — Impresión ═════════════════════════════════ */
+@page { margin: 14mm 16mm; }
+
+:root {
+  --s0: #fff !important;
+  --s1: #fff !important;
+  --s2: #f5f5f5 !important;
+  --s3: #eee !important;
+  --b0: #e0e0e0 !important;
+  --b1: #ccc !important;
+  --b2: #aaa !important;
+  --t1: #000 !important;
+  --t2: #222 !important;
+  --t3: #555 !important;
+  --red: #000 !important;
+  --red-hi: #000 !important;
+  --red-subtle: #f0f0f0 !important;
+  --red-border: #888 !important;
+  --ok: #000 !important;
+  --ok-hi: #000 !important;
+  --ok-subtle: #f0f0f0 !important;
+  --ok-border: #888 !important;
+  --enter: #000 !important;
+  --enter-hi: #000 !important;
+  --enter-subtle: #eee !important;
+  --leave: #444 !important;
+  --leave-hi: #444 !important;
+  --leave-subtle: #eee !important;
+  --pivot-col: #222 !important;
+  --pivot-hi: #222 !important;
+  --pivot-subtle: #eee !important;
+  --err: #000 !important;
+  --err-hi: #000 !important;
+  --err-subtle: #eee !important;
+}
+
+body {
+  background: #fff !important;
+  color: #000 !important;
+}
+
+.site-header, .site-footer, .skip-link,
+.solve-actions, .step-nav, .mode-tabs,
+.config-sidebar, .landing-hero, .landing-section,
+.landing-cta, .hero-badge, .preview-card,
+.messages, .sidebar-actions-v, .sidebar-guide,
+.step-chrome, .progress-bar-wrap, .focus-toggle,
+.mini-graph-wrap, .solver-page-header, .solver-howto-bar,
+.hero-particles, .hero-bg, .howto-grid, .howto-tip,
+#btn-validate, #btn-clear, #btn-load-example,
+[data-nav], .cta-primary, .cta-secondary {
+  display: none !important;
+}
+
+main { width: 100% !important; padding: 0 !important; }
+
+.simplex-table td.is-pivot-cell {
+  background: #ddd !important;
+  color: #000 !important;
+  border: 2px solid #555 !important;
+}
+
+.full-procedure .step-block { break-inside: avoid; margin-bottom: 12mm; }
+
+.results.is-hidden { display: block !important; }
+.view[hidden] { display: none !important; }
+#view-resolver { display: block !important; }
+
+*, *::before, *::after {
+  animation: none !important;
+  transition: none !important;
+}
