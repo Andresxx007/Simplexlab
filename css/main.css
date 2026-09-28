@@ -1720,7 +1720,14 @@ main { position:relative; z-index:1; }
   color:var(--ok-hi); font-weight:600;
 }
 .simplex-table thead .col-rhs { background:var(--s2); color:var(--t3); }
-.simplex-table tr.z-row td { border-top:2px solid var(--b2); background:var(--red-subtle); color:var(--t1); font-weight:700; }
+.simplex-table .col-ratio {
+  border-left: 1px solid var(--b0) !important;
+  color: var(--t2);
+  font-weight: 600;
+}
+.simplex-table thead .col-ratio { background: var(--s2); color: var(--t3); }
+.simplex-table .is-best-ratio { color: var(--red); font-weight: 700; }
+.simplex-table tr.z-row td { border-bottom:2px solid var(--b2); background:var(--red-subtle); color:var(--t1); font-weight:700; }
 .simplex-table tr.z-row .col-basic { background:var(--s1); }
 .simplex-table tr.z-row .col-rhs { background:var(--ok-subtle); }
 .simplex-table th.is-pivot-col { background:var(--enter-subtle); color:var(--enter-hi); }
@@ -1756,18 +1763,33 @@ main { position:relative; z-index:1; }
 .focus-toggle.is-active { background:var(--red-subtle); border-color:var(--red-border); color:var(--red-hi); }
 .focus-toggle:focus-visible { outline:2px solid var(--red); outline-offset:2px; }
 
-/* Ops list animado */
-.ops-list { list-style:none; font-family:var(--fm); font-size:.85rem; color:var(--t2); display:flex; flex-direction:column; gap:.25rem; margin-bottom:1rem; }
+.section-help {
+  margin:-.35rem 0 .7rem;
+  color:var(--t2);
+  font-size:.86rem;
+  line-height:1.55;
+  max-width:42rem;
+}
+/* Ops list */
+.ops-list { list-style:none; display:flex; flex-direction:column; gap:.45rem; margin-bottom:1rem; }
 .ops-list li {
-  display:flex; align-items:center; gap:.5rem; padding:.42rem .75rem;
+  display:flex; align-items:flex-start; gap:.7rem; padding:.65rem .8rem;
   background:var(--s1); border:1px solid var(--b1); border-radius:var(--r2);
   animation:op-slide-in .3s var(--ease) both;
 }
-.ops-list li .op-arrow { color:var(--red); flex-shrink:0; }
+.op-num {
+  flex-shrink:0; width:1.45rem; height:1.45rem; border-radius:999px;
+  display:grid; place-items:center;
+  background:var(--red); color:#fff; font-size:.75rem; font-weight:700;
+}
+.op-body { min-width:0; }
+.op-formula { font-family:var(--fm); font-size:.92rem; color:var(--t1); margin:0 0 .2rem; }
+.op-why { margin:0; color:var(--t2); font-size:.82rem; line-height:1.45; }
 @keyframes op-slide-in { from{opacity:0;transform:translateX(-10px);} to{opacity:1;transform:translateX(0);} }
 
 /* Ratio table */
-.ratio-table { width:100%; border-collapse:collapse; font-family:var(--fm); font-size:.85rem; margin-bottom:1rem; border:1px solid var(--b1); border-radius:var(--r3); overflow:hidden; }
+.ratio-scroll { overflow-x:auto; margin-bottom:1rem; }
+.ratio-table { width:100%; border-collapse:collapse; font-family:var(--fm); font-size:.85rem; border:1px solid var(--b1); border-radius:var(--r3); overflow:hidden; }
 .ratio-table th { background:var(--s2); color:var(--t3); font-size:.7rem; font-weight:600; letter-spacing:.05em; text-transform:uppercase; text-align:left; padding:.5rem .7rem; border-bottom:1px solid var(--b1); }
 .ratio-table td { text-align:left; padding:.5rem .7rem; border-bottom:1px solid var(--b0); color:var(--t2); }
 .ratio-table tbody tr:last-child td { border-bottom:none; }

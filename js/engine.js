@@ -87,7 +87,7 @@ function normalize(problem) {
   constraints.forEach((con) => {
     if (con.op === '<=') {
       s += 1;
-      slackNames.push(varName('S', s));
+      slackNames.push(varName('h', s));
     } else if (con.op === '>=') {
       e += 1;
       a += 1;
@@ -100,7 +100,7 @@ function normalize(problem) {
   });
 
   const colNames = [];
-  for (let i = 1; i <= numVars; i++) colNames.push(varName('X', i));
+  for (let i = 1; i <= numVars; i++) colNames.push(varName('x', i));
   colNames.push(...slackNames, ...excessNames, ...artNames);
 
   const nCols = colNames.length;
@@ -238,10 +238,12 @@ function findLeaving(tableau, pivotCol, useBland) {
         row: i,
         basic: tableau.basic[i],
         ratio: null,
+        coef: a,
+        rhs: cellFrac(tableau.rhs[i]),
         eligible: false,
         note: a.isZero()
-          ? 'Coeficiente cero: no participa'
-          : 'Coeficiente negativo: no participa',
+          ? 'No participa: el coeficiente de la columna que entra es 0.'
+          : 'No participa: el coeficiente de la columna que entra es negativo.',
       });
       continue;
     }
@@ -252,8 +254,10 @@ function findLeaving(tableau, pivotCol, useBland) {
       row: i,
       basic: tableau.basic[i],
       ratio,
+      coef: a,
+      rhs: b,
       eligible: true,
-      note: `${b.toString()} / ${a.toString()} = ${ratio.toString()}`,
+      note: `L.D. ÷ coeficiente = ${b.toString()} ÷ ${a.toString()} = ${ratio.toString()}`,
     });
 
     const basicIdx = parseVarIndex(tableau.basic[i]);
@@ -280,23 +284,35 @@ function pivot(tableau, pivotRow, pivotCol) {
   const t = cloneTableau(tableau);
   const ops = [];
   const p = cellFrac(t.matrix[pivotRow][pivotCol]);
+  const leaving = t.basic[pivotRow];
+  const entering = t.colNames[pivotCol];
 
   for (let j = 0; j < t.colNames.length; j++) {
     t.matrix[pivotRow][j] = t.matrix[pivotRow][j].div(p);
   }
   t.rhs[pivotRow] = t.rhs[pivotRow].div(p);
-  ops.push(`F${pivotRow + 1} ← F${pivotRow + 1} ÷ ${p.toString()}`);
+  ops.push({
+    formula: `Fila ${leaving} ← fila ${leaving} ÷ ${p.toString()}`,
+    why: `Sale ${leaving} y entra ${entering}. Se divide toda la fila entre el pivote (${p.toString()}) para que ese número quede en 1.`,
+  });
 
   for (let i = 0; i < t.matrix.length; i++) {
     if (i === pivotRow) continue;
     const factor = cellFrac(t.matrix[i][pivotCol]);
     if (factor.isZero()) continue;
+    const rowName = t.basic[i];
     for (let j = 0; j < t.colNames.length; j++) {
       t.matrix[i][j] = t.matrix[i][j].sub(t.matrix[pivotRow][j].mul(factor));
     }
     t.rhs[i] = t.rhs[i].sub(t.rhs[pivotRow].mul(factor));
-    const sign = factor.isNegative() ? '+' : '−';
-    ops.push(`F${i + 1} ← F${i + 1} ${sign} (${factor.abs().toString()}) · F${pivotRow + 1}`);
+    const abs = factor.abs().toString();
+    const formula = factor.isNegative()
+      ? `Fila ${rowName} ← fila ${rowName} + ${abs} × fila pivote`
+      : `Fila ${rowName} ← fila ${rowName} − ${abs} × fila pivote`;
+    ops.push({
+      formula,
+      why: `Se anula el coeficiente de ${entering} en la fila ${rowName}, para que quede 0.`,
+    });
   }
 
   const zFactor = t.zRow[pivotCol];
@@ -308,7 +324,14 @@ function pivot(tableau, pivotRow, pivotCol) {
     }
     const prRhs = cellFrac(t.rhs[pivotRow]);
     t.zRhs = t.zRhs.sub(new BigCoeff(zFactor.m.mul(prRhs), zFactor.c.mul(prRhs)));
-    ops.push(`Fila Z ← Fila Z − (${zFactor.toString()}) · F${pivotRow + 1}`);
+    const zAbs = zFactor.isNegative() ? zFactor.neg().toString() : zFactor.toString();
+    const zFormula = zFactor.isNegative()
+      ? `Fila Z ← fila Z + ${zAbs} × fila pivote`
+      : `Fila Z ← fila Z − ${zAbs} × fila pivote`;
+    ops.push({
+      formula: zFormula,
+      why: `Se anula el coeficiente de ${entering} en Z. En la nueva tabla ese lugar queda en 0.`,
+    });
   }
 
   t.basic[pivotRow] = t.colNames[pivotCol];

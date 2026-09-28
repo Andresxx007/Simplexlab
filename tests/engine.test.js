@@ -163,8 +163,27 @@ describe('Problemas con 3 o más variables', () => {
     result.verification.forEach((v) => {
       assert.equal(v.satisfied, true);
     });
-    assert.ok(eqFrac(result.shadowPrices['S₁'], '1'));
-    assert.ok(eqFrac(result.shadowPrices['S₂'], '0'));
-    assert.ok(eqFrac(result.shadowPrices['S₃'], '1'));
+    assert.ok(eqFrac(result.shadowPrices['h₁'], '1'));
+    assert.ok(eqFrac(result.shadowPrices['h₂'], '0'));
+    assert.ok(eqFrac(result.shadowPrices['h₃'], '1'));
+  });
+
+  it('taller de carpintería del material: Max 15x₁+20x₂ → x=(2,2), Z=70', () => {
+    const result = solve({
+      sense: 'max',
+      numVars: 2,
+      objective: ['15', '20'],
+      constraints: [
+        { coeffs: ['2', '2'], op: '<=', rhs: '8' },
+        { coeffs: ['1', '2'], op: '<=', rhs: '6' },
+      ],
+    });
+    assert.equal(result.status, 'optimal');
+    assert.ok(eqFrac(result.values[0], '2'));
+    assert.ok(eqFrac(result.values[1], '2'));
+    assert.ok(eqFrac(result.z, '70'));
+    assert.ok(result.slackNames[0].startsWith('h'));
+    assert.ok(result.slackNames[1].startsWith('h'));
+    assert.ok(result.colNames[0].startsWith('x'));
   });
 });

@@ -302,7 +302,7 @@ export class AppUI {
 
     for (let j = 0; j < this.state.numVars; j++) {
       const field = el('label', { className: 'coef-field' });
-      field.append(el('span', { className: 'coef-label', text: `X${SUB[j + 1]}` }));
+      field.append(el('span', { className: 'coef-label', text: `x${SUB[j + 1]}` }));
       const inp = el('input', {
         id: `obj-${j}`,
         type: 'text',
@@ -326,7 +326,7 @@ export class AppUI {
 
       for (let j = 0; j < this.state.numVars; j++) {
         const field = el('label', { className: 'coef-field' });
-        field.append(el('span', { className: 'coef-label', text: `X${SUB[j + 1]}` }));
+        field.append(el('span', { className: 'coef-label', text: `x${SUB[j + 1]}` }));
         const inp = el('input', {
           id: `con-${i}-${j}`,
           type: 'text',
@@ -356,7 +356,7 @@ export class AppUI {
       row.append(op);
 
       const rhsField = el('label', { className: 'rhs-field' });
-      rhsField.append(el('span', { className: 'rhs-label', text: 'LD' }));
+      rhsField.append(el('span', { className: 'rhs-label', text: 'L.D.' }));
       const rhs = el('input', {
         id: `rhs-${i}`,
         type: 'text',
@@ -433,7 +433,7 @@ export class AppUI {
   updatePreview() {
     const raw = this.collectRaw();
     const terms = (coeffs) => coeffs
-      .map((c, j) => `${c === '' || c == null ? '0' : c}X${SUB[j + 1]}`)
+      .map((c, j) => `${c === '' || c == null ? '0' : c}x${SUB[j + 1]}`)
       .join(' + ')
       .replace(/\+ -/g, '− ');
 
@@ -441,7 +441,7 @@ export class AppUI {
     raw.constraints.forEach((con) => {
       text += `${terms(con.coeffs)} ${opSymbol(con.op)} ${con.rhs || '?'}\n`;
     });
-    text += `X${SUB[1]}…X${SUB[raw.numVars]} ≥ 0`;
+    text += `x${SUB[1]}…x${SUB[raw.numVars]} ≥ 0`;
     $('#live-preview').textContent = text;
   }
 
@@ -632,7 +632,7 @@ export class AppUI {
     if (isSolved) {
       result.values.forEach((v, i) => {
         const li = el('li');
-        li.append(el('span', { text: varName('X', i + 1) }));
+        li.append(el('span', { text: varName('x', i + 1) }));
         li.append(el('span', { className: 'key-val', text: this.fmt(v) }));
         ul.append(li);
       });
@@ -689,7 +689,7 @@ export class AppUI {
       const ul2 = el('ul', { className: 'solution-list' });
       result.alternateValues.forEach((v, i) => {
         const li = el('li');
-        li.append(el('span', { text: varName('X', i + 1) }));
+        li.append(el('span', { text: varName('x', i + 1) }));
         li.append(el('span', { className: 'key-val', text: this.fmt(v) }));
         ul2.append(li);
       });
@@ -868,48 +868,90 @@ export class AppUI {
 
     // Tables
     const beforeTableau = step.meta?.before && step.pivotCol != null ? step.meta.before : null;
+    const next = result.steps[idx + 1];
     if (beforeTableau) {
       root.append(this.renderTableau(beforeTableau, {
-        pivotCol: step.pivotCol, pivotRow: step.pivotRow, showNegZ: true,
+        pivotCol: step.pivotCol,
+        pivotRow: step.pivotRow,
+        showNegZ: true,
+        ratios: step.ratios,
       }, 'Tabla antes del pivote'));
-      root.append(this.renderTableau(step.tableau, { showNegZ: true }, 'Tabla después del pivote'));
+      root.append(this.renderTableau(step.tableau, {
+        showNegZ: true,
+        ratios: next?.ratios || null,
+      }, 'Tabla después del pivote'));
     } else {
       root.append(this.renderTableau(step.tableau, {
-        pivotCol: step.pivotCol, pivotRow: step.pivotRow, showNegZ: true,
+        pivotCol: step.pivotCol,
+        pivotRow: step.pivotRow,
+        showNegZ: true,
+        ratios: step.ratios || next?.ratios || null,
       }, step.title));
     }
 
     // Ratio test
     if (step.ratios) {
       root.append(el('p', { className: 'results-section-title', text: 'Prueba de razón' }));
+      const entering = step.entering || 'la variable que entra';
+      root.append(el('p', {
+        className: 'section-help',
+        text: `En la columna de ${entering} solo cuentan las filas con coeficiente positivo. La razón es L.D. ÷ ese coeficiente. La razón más pequeña indica la variable que sale.`,
+      }));
+      const scroll = el('div', { className: 'ratio-scroll' });
       const rt = el('table', { className: 'ratio-table' });
       rt.append(el('thead', {}, [
         el('tr', {}, [
-          el('th', { text: 'Fila' }), el('th', { text: 'Básica' }),
-          el('th', { text: 'Razón' }), el('th', { text: 'Nota' }),
+          el('th', { text: 'Variable' }),
+          el('th', { text: 'Cálculo' }),
+          el('th', { text: 'Razón' }),
+          el('th', { text: 'Qué pasa' }),
         ]),
       ]));
       const tb = el('tbody');
+      const winner = step.ratios.find((r) => r.row === step.pivotRow);
+      const tied = !!(winner?.ratio && step.ratios.some((r) => (
+        r.eligible && r.row !== winner.row && r.ratio && r.ratio.equals(winner.ratio)
+      )));
       step.ratios.forEach((r) => {
-        tb.append(el('tr', { className: step.pivotRow === r.row ? 'is-best' : '' }, [
-          el('td', { text: String(r.row + 1) }),
+        const isBest = step.pivotRow === r.row;
+        let calc = '—';
+        if (r.eligible && r.rhs && r.coef) {
+          calc = `${this.fmt(r.rhs)} ÷ ${this.fmt(r.coef)}`;
+        }
+        let decision = r.note;
+        if (r.eligible) {
+          decision = isBest
+            ? (tied ? `Sale ${r.basic} (empate; se elige esta)` : `Sale ${r.basic}: es la razón menor`)
+            : 'Se queda en la base';
+        }
+        tb.append(el('tr', { className: isBest ? 'is-best' : '' }, [
           el('td', { text: r.basic }),
+          el('td', { text: calc }),
           el('td', { text: r.ratio ? this.fmt(r.ratio) : '—' }),
-          el('td', { text: r.note }),
+          el('td', { text: decision }),
         ]));
       });
       rt.append(tb);
-      root.append(rt);
+      scroll.append(rt);
+      root.append(scroll);
     }
 
-    // Row ops — con flechas animadas y stagger
     if (step.rowOps?.length) {
       root.append(el('p', { className: 'results-section-title', text: 'Operaciones de fila' }));
+      root.append(el('p', {
+        className: 'section-help',
+        text: 'Primero se deja el pivote en 1. Después cada otra fila se combina con la fila pivote para que, en la columna que entra, quede 0.',
+      }));
       const ol = el('ol', { className: 'ops-list' });
       step.rowOps.forEach((op, i) => {
+        const formula = typeof op === 'string' ? op : op.formula;
+        const why = typeof op === 'string' ? '' : op.why;
         const li = el('li', { style: `animation-delay: ${i * 60}ms` });
-        li.append(el('span', { className: 'op-arrow', text: '→' }));
-        li.append(document.createTextNode(op));
+        li.append(el('span', { className: 'op-num', text: String(i + 1) }));
+        const body = el('div', { className: 'op-body' });
+        body.append(el('p', { className: 'op-formula', text: formula }));
+        if (why) body.append(el('p', { className: 'op-why', text: why }));
+        li.append(body);
         ol.append(li);
       });
       root.append(ol);
@@ -975,6 +1017,7 @@ export class AppUI {
         pivotCol: step.pivotCol,
         pivotRow: step.pivotRow,
         showNegZ: true,
+        ratios: result.steps[i + 1]?.ratios || (step.pivotRow == null ? step.ratios : null),
       }));
       wrap.append(block);
     });
@@ -1019,11 +1062,31 @@ export class AppUI {
         text: name,
       }));
     });
-    hr.append(el('th', { className: 'col-rhs', text: 'LD' }));
+    hr.append(el('th', { className: 'col-rhs', text: 'L.D.' }));
+    const ratios = Array.isArray(highlight.ratios) ? highlight.ratios : null;
+    if (ratios) hr.append(el('th', { className: 'col-ratio', text: 'R' }));
     thead.append(hr);
     table.append(thead);
 
     const tbody = el('tbody');
+
+    // Fila Z primero, como en el material (fila 1 de la tabla)
+    const zr = el('tr', { className: 'z-row' });
+    zr.append(el('td', { className: 'col-basic', text: 'Z' }));
+    tableau.zRow.forEach((cell, j) => {
+      const isNeg = highlight.showNegZ && cell.isNegative();
+      zr.append(el('td', {
+        className: [
+          highlight.pivotCol === j ? 'is-pivot-col' : '',
+          isNeg ? 'is-neg-z' : '',
+        ].filter(Boolean).join(' '),
+        text: this.fmt(cell),
+      }));
+    });
+    zr.append(el('td', { className: 'col-rhs', text: this.fmt(tableau.zRhs) }));
+    if (ratios) zr.append(el('td', { className: 'col-ratio', text: '—' }));
+    tbody.append(zr);
+
     tableau.matrix.forEach((row, i) => {
       const tr = el('tr', { className: highlight.pivotRow === i ? 'is-pivot-row' : '' });
       tr.append(el('td', { className: 'col-basic', text: tableau.basic[i] }));
@@ -1038,24 +1101,16 @@ export class AppUI {
         }));
       });
       tr.append(el('td', { className: 'col-rhs', text: this.fmt(tableau.rhs[i]) }));
+      if (ratios) {
+        const hit = ratios.find((r) => r.row === i);
+        const show = hit && hit.eligible && hit.ratio;
+        tr.append(el('td', {
+          className: show && highlight.pivotRow === i ? 'col-ratio is-best-ratio' : 'col-ratio',
+          text: show ? this.fmt(hit.ratio) : '—',
+        }));
+      }
       tbody.append(tr);
     });
-
-    // Z row
-    const zr = el('tr', { className: 'z-row' });
-    zr.append(el('td', { className: 'col-basic', text: 'Z' }));
-    tableau.zRow.forEach((cell, j) => {
-      const isNeg = highlight.showNegZ && cell.isNegative();
-      zr.append(el('td', {
-        className: [
-          highlight.pivotCol === j ? 'is-pivot-col' : '',
-          isNeg ? 'is-neg-z' : '',
-        ].filter(Boolean).join(' '),
-        text: this.fmt(cell),
-      }));
-    });
-    zr.append(el('td', { className: 'col-rhs', text: this.fmt(tableau.zRhs) }));
-    tbody.append(zr);
 
     table.append(tbody);
     wrap.append(table);

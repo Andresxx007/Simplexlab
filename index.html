@@ -139,19 +139,19 @@
                     <div class="hero-mini-table">
                       <table>
                         <thead>
-                          <tr><th>Base</th><th>X₁</th><th>X₂</th><th>S₁</th><th>LD</th></tr>
+                          <tr><th>Base</th><th>x₁</th><th>x₂</th><th>h₁</th><th>L.D.</th></tr>
                         </thead>
                         <tbody>
-                          <tr><td>S₁</td><td>1</td><td>0</td><td>1</td><td>4</td></tr>
-                          <tr class="is-pivot-row"><td>S₂</td><td>0</td><td class="is-pvt">2</td><td>0</td><td>12</td></tr>
-                          <tr><td>S₃</td><td>3</td><td>2</td><td>0</td><td>18</td></tr>
                           <tr class="is-z"><td>Z</td><td>−3</td><td class="is-neg">−5</td><td>0</td><td>0</td></tr>
+                          <tr><td>h₁</td><td>1</td><td>0</td><td>1</td><td>4</td></tr>
+                          <tr class="is-pivot-row"><td>h₂</td><td>0</td><td class="is-pvt">2</td><td>0</td><td>12</td></tr>
+                          <tr><td>h₃</td><td>3</td><td>2</td><td>0</td><td>18</td></tr>
                         </tbody>
                       </table>
                     </div>
                     <div class="hero-table-tags">
-                      <span class="htag htag-enter">↑ X₂ entra</span>
-                      <span class="htag htag-leave">← S₂ sale</span>
+                      <span class="htag htag-enter">↑ x₂ entra</span>
+                      <span class="htag htag-leave">← h₂ sale</span>
                     </div>
                   </div>
                 </div>
@@ -241,7 +241,7 @@
             <div class="explainer-card" style="--delay:80ms">
               <div class="exp-num">02</div>
               <h3>Forma estándar</h3>
-              <p>El algoritmo agrega variables auxiliares: <strong>S</strong> (holgura) en ≤, <strong>E</strong> (exceso) en ≥ y <strong>A</strong> (artificial) cuando hace falta una base inicial.</p>
+              <p>El algoritmo agrega variables auxiliares: <strong>h</strong> (holgura) en ≤, <strong>E</strong> (exceso) en ≥ y <strong>A</strong> (artificial) cuando hace falta una base inicial.</p>
             </div>
             <div class="explainer-card" style="--delay:160ms">
               <div class="exp-num">03</div>
@@ -266,8 +266,8 @@
             <div class="var-card var-s">
               <div class="var-letter">S</div>
               <h3>Variable de holgura</h3>
-              <p>Se suma en restricciones <strong>≤</strong>. Representa el recurso que sobra. Si S = 0, la restricción está activa — el recurso se agota completamente.</p>
-              <div class="var-formula">a₁x₁ + a₂x₂ + <strong>S</strong> = b &ensp;→&ensp; S ≥ 0</div>
+              <p>Se suma en restricciones <strong>≤</strong>. Representa el recurso que sobra. Si h = 0, la restricción está activa — el recurso se agota completamente.</p>
+              <div class="var-formula">a₁x₁ + a₂x₂ + <strong>h</strong> = b &ensp;→&ensp; h ≥ 0</div>
             </div>
             <div class="var-card var-e">
               <div class="var-letter">E</div>
@@ -565,7 +565,7 @@
             <div id="problem-form" class="problem-form"></div>
             <p class="nonneg-note">
               <svg viewBox="0 0 14 14" fill="none" width="12" height="12"><path d="M7 1v6M4 4l3-3 3 3M1 11h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              Xⱼ ≥ 0 para todo j — no negatividad implícita
+              xⱼ ≥ 0 para todo j — no negatividad implícita
             </p>
           </div>
 
@@ -626,7 +626,7 @@
           <h2>Forma estándar y canónica</h2>
           <p>Para aplicar el Simplex, el problema se transforma en <em>forma estándar</em>:</p>
           <ul>
-            <li><strong>≤</strong> → sumar variable de holgura S (entra a la base inicial)</li>
+            <li><strong>≤</strong> → sumar variable de holgura h (entra a la base inicial)</li>
             <li><strong>≥</strong> → restar exceso E y sumar artificial A (A entra a la base inicial)</li>
             <li><strong>=</strong> → sumar artificial A (A entra a la base inicial)</li>
             <li><strong>Min Z</strong> → multiplicar la función objetivo por −1, resolver como Max, al final invertir el signo de Z</li>
@@ -704,8 +704,8 @@
           <div class="theory-formula-card" style="margin-top:.6rem">
             <p class="tf-title">Notación usada</p>
             <div class="tf-body">
-              <p>X₁…Xₙ — variables de decisión</p>
-              <p>S — holgura (slack), restricción ≤</p>
+              <p>x₁…xₙ — variables de decisión</p>
+              <p>h — holgura, restricción ≤</p>
               <p>E — exceso (surplus), restricción ≥</p>
               <p>A — artificial, restricciones ≥ y =</p>
               <p>LD — lado derecho (RHS)</p>

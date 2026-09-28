@@ -83,13 +83,13 @@ export function explainStep(step, index, total) {
     const eligible = step.ratios.filter((r) => r.eligible);
     const skipped = step.ratios.filter((r) => !r.eligible);
     if (eligible.length) {
-      parts.push(
-        `Prueba de razón: ${eligible.map((r) => `${r.basic} → ${r.ratio.toString()}`).join('; ')}.`
-      );
+      const ordered = [...eligible].sort((a, b) => (a.ratio.lt(b.ratio) ? -1 : a.ratio.gt(b.ratio) ? 1 : 0));
+      const detail = ordered.map((r) => `${r.basic}: ${r.rhs.toString()} ÷ ${r.coef.toString()} = ${r.ratio.toString()}`).join('; ');
+      parts.push(`Prueba de razón (L.D. ÷ coeficiente). La menor decide quién sale: ${detail}.`);
     }
     if (skipped.length) {
       parts.push(
-        `No participan: ${skipped.map((r) => `${r.basic} (${r.note})`).join('; ')}.`
+        `Quedan fuera de la prueba: ${skipped.map((r) => r.basic).join(', ')}, porque su coeficiente en la columna que entra no es positivo.`
       );
     }
   }
@@ -115,7 +115,7 @@ export function explainSolution(result, displayMode = 'fraction') {
     const sense = result.originalSense === 'min' ? 'mínimo' : 'máximo';
     lines.push(`Valor ${sense} de Z = ${fmt(result.z)}.`);
     result.values.forEach((v, i) => {
-      lines.push(`${varName('X', i + 1)} = ${fmt(v)}`);
+      lines.push(`${varName('x', i + 1)} = ${fmt(v)}`);
     });
 
     if (result.slacks && Object.keys(result.slacks).length) {
@@ -150,7 +150,7 @@ export function explainSolution(result, displayMode = 'fraction') {
 
 export const GLOSSARY = {
   holgura:
-    'Variable que convierte una restricción ≤ en igualdad. Si vale más que cero, el recurso sobra.',
+    'Variable h que convierte una restricción ≤ en igualdad (h₁, h₂, …). Si vale más que cero, el recurso sobra. En la base inicial entran las holguras.',
   exceso:
     'Variable que convierte una restricción ≥ en igualdad. Mide cuánto se supera el mínimo exigido.',
   artificial:
