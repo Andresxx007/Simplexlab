@@ -3,13 +3,13 @@
  */
 
 import { solve, varName } from './engine.js';
+import { BigCoeff } from './fractions.js';
 import { validateProblem } from './validator.js';
-import { explainStep, statusCopy, resultAdvice, GLOSSARY } from './explainer.js';
+import { statusCopy, resultAdvice, GLOSSARY } from './explainer.js';
 import { EXAMPLES } from './examples.js';
 import {
   loadHistory, saveHistoryItem, removeHistoryItem, clearHistory, storageAvailable,
 } from './storage.js';
-import { computeFeasibleRegion, renderGraph, extractSimplexPath } from './graph.js';
 import { startHeroCanvas, startDemoCanvas } from './motion.js';
 
 const SUB = ['', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉', '₁₀'];
@@ -540,6 +540,92 @@ export class AppUI {
     }
   }
 
+  exprTerms(coeffs) {
+    const parts = [];
+    coeffs.forEach((coef, j) => {
+      const raw = String(coef);
+      if (raw === '0') return;
+      const name = `x${SUB[j + 1] || j + 1}`;
+      if (raw === '1') parts.push(name);
+      else if (raw === '-1') parts.push(`−${name}`);
+      else parts.push(`${raw.replace(/-/g, '−')}${name}`);
+    });
+    if (!parts.length) return '0';
+    return parts.join(' + ').replace(/\+ −/g, '− ');
+  }
+
+  printSolution() {
+    const result = this.state.result;
+    const problem = this.state.problemSnapshot;
+    if (!result || !problem) return;
+
+    document.getElementById('print-sheet')?.remove();
+    const sheet = el('article', { id: 'print-sheet' });
+
+    const head = el('header', { className: 'pdf-head' });
+    head.append(el('p', { className: 'pdf-brand', text: 'SimplexLab · Investigación de Operaciones · UEB' }));
+    head.append(el('h1', { text: 'Ejercicio resuelto' }));
+    head.append(el('p', {
+      className: 'pdf-date',
+      text: new Date().toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' }),
+    }));
+    sheet.append(head);
+
+    const problemBox = el('section', { className: 'pdf-block pdf-problem' });
+    problemBox.append(el('h2', { text: 'Problema' }));
+    problemBox.append(el('p', { className: 'pdf-kicker', text: problem.sense === 'min' ? 'Minimizar' : 'Maximizar' }));
+    problemBox.append(el('p', { className: 'pdf-eq', text: `Z = ${this.exprTerms(problem.objective)}` }));
+    problemBox.append(el('p', { className: 'pdf-kicker', text: 'Sujeto a' }));
+    const cons = el('ul', { className: 'pdf-cons' });
+    problem.constraints.forEach((con) => {
+      cons.append(el('li', { text: `${this.exprTerms(con.coeffs)}  ${opSymbol(con.op)}  ${String(con.rhs).replace(/-/g, '−')}` }));
+    });
+    problemBox.append(cons);
+    const names = Array.from({ length: problem.numVars }, (_, i) => `x${SUB[i + 1] || i + 1}`);
+    problemBox.append(el('p', { className: 'pdf-note', text: `${names.join(', ')} ≥ 0` }));
+    sheet.append(problemBox);
+
+    const answer = el('section', { className: 'pdf-block pdf-answer' });
+    answer.append(el('h2', { text: 'Resultado' }));
+    answer.append(el('p', { className: 'pdf-status', text: statusCopy(result.status).title }));
+    const solved = result.status === 'optimal' || result.status === 'alternate';
+    if (solved) {
+      const list = el('ul', { className: 'pdf-values' });
+      result.values.forEach((v, i) => {
+        list.append(el('li', { text: `${varName('x', i + 1)} = ${this.fmt(v)}` }));
+      });
+      list.append(el('li', { className: 'is-z', text: `Z = ${this.fmt(result.z)}` }));
+      answer.append(list);
+      if (result.slacks && Object.keys(result.slacks).length) {
+        const slackBits = Object.entries(result.slacks).map(([name, val]) => `${name} = ${this.fmt(val)}`);
+        answer.append(el('p', { className: 'pdf-note', text: `Holguras: ${slackBits.join(' · ')}` }));
+      }
+      if (result.alternateValues) {
+        const alt = result.alternateValues.map((v, i) => `${varName('x', i + 1)} = ${this.fmt(v)}`).join(', ');
+        answer.append(el('p', { className: 'pdf-note', text: `Otra solución óptima básica: ${alt}` }));
+      }
+    } else {
+      answer.append(el('p', { className: 'pdf-note', text: statusCopy(result.status).body }));
+    }
+    sheet.append(answer);
+
+    const proc = el('section', { className: 'pdf-block pdf-procedure' });
+    proc.append(el('h2', { text: 'Procedimiento' }));
+    this.renderFull(proc, result);
+    sheet.append(proc);
+
+    document.body.append(sheet);
+    const previousTitle = document.title;
+    document.title = 'SimplexLab — ejercicio resuelto';
+    const cleanup = () => {
+      sheet.remove();
+      document.title = previousTitle;
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    window.print();
+  }
+
   persistHistory(problem, result) {
     if (!storageAvailable()) {
       if (!this.storageWarned) {
@@ -616,13 +702,25 @@ export class AppUI {
     });
     root.append(tabs);
 
+    const tools = el('div', { className: 'result-tools' });
+    tools.append(el('button', {
+      type: 'button',
+      className: 'btn-pdf',
+      text: 'Generar PDF',
+      onClick: () => this.printSolution(),
+    }));
+    tools.append(el('p', {
+      className: 'pdf-hint',
+      text: 'Se abre la ventana de impresión. Elija Guardar como PDF.',
+    }));
+    root.append(tools);
+
     if (this.state.viewMode === 'auto') this.renderAuto(root, result);
     else if (this.state.viewMode === 'step') this.renderStep(root, result);
     else this.renderFull(root, result);
   }
 
   renderAuto(root, result) {
-    const grid = el('div', { className: 'results-grid' });
     const isSolved = result.status === 'optimal' || result.status === 'alternate';
 
     const left = el('div', { className: 'result-card' });
@@ -705,7 +803,9 @@ export class AppUI {
       if (!isSolved) {
         left.append(el('p', {
           className: 'verify-note',
-          text: 'Se evalúan las restricciones originales en el último punto de la tabla (aún no factible). «Incumplida» señala el conflicto.',
+          text: result.status === 'unbounded'
+            ? 'El último vértice de la tabla sí cumple las restricciones. El problema no tiene óptimo porque, desde ahí, Z puede seguir mejorando sin límite.'
+            : 'Se evalúan las restricciones originales en el último punto de la tabla. «Incumplida» señala el conflicto.',
         }));
       }
 
@@ -762,14 +862,7 @@ export class AppUI {
       left.append(vt);
     }
 
-    // Right: graph
-    const right = el('div', { className: 'result-card' });
-    right.append(el('h3', { text: 'Región factible' }));
-    const gwrap = el('div', { className: 'graph-wrap' });
-    right.append(gwrap);
-    grid.append(left, right);
-    root.append(grid);
-    this.drawGraph(gwrap, result);
+    root.append(left);
 
     const cta = el('div', { style: 'margin-top:1.25rem; display:flex; gap:.6rem; flex-wrap:wrap;' });
     cta.append(
@@ -789,38 +882,285 @@ export class AppUI {
     root.append(cta);
   }
 
-  drawGraph(container, result) {
-    const problem = this.state.problemSnapshot;
-    if (!problem || problem.numVars !== 2) {
-      container.append(el('p', {
-        className: 'graph-message',
-        text: 'Gráfico disponible solo con exactamente dos variables.',
-      }));
-      return;
-    }
-    const region = computeFeasibleRegion(problem);
-    const path = extractSimplexPath(result);
-    const optPt = (result.status === 'optimal' || result.status === 'alternate')
-      ? { x: result.values[0].toNumber(), y: result.values[1].toNumber() }
-      : null;
-    renderGraph(container, region, {
-      optimalPoint: optPt, path,
-      unbounded: result.status === 'unbounded',
-      currentVertex: path.length ? path[path.length - 1] : null,
+  beat(n, kicker, title, text, extra) {
+    const card = el('div', { className: 'beat-card' });
+    card.append(el('p', { className: 'beat-kicker', text: kicker }));
+    if (title) card.append(el('p', { className: 'beat-title', text: title }));
+    if (text) card.append(el('p', { className: 'beat-text', text }));
+    if (extra) card.append(extra);
+    const row = el('section', { className: 'beat', style: `animation-delay:${(n - 1) * 80}ms` });
+    row.append(el('span', { className: 'beat-index', text: String(n), 'aria-hidden': 'true' }));
+    row.append(card);
+    return row;
+  }
+
+  zNegatives(tableau) {
+    const found = [];
+    tableau.zRow.forEach((cell, j) => {
+      if (!cell.isNegative()) return;
+      if (tableau.basic.includes(tableau.colNames[j])) return;
+      found.push({ name: tableau.colNames[j], coef: cell });
     });
+    return found;
+  }
+
+  renderStartGuide(step, result) {
+    const guide = el('div', { className: 'guide-grid' });
+    const holguras = step.tableau.basic.filter((name) => name.startsWith('h'));
+    const zBits = [];
+    for (let j = 0; j < result.numVars; j++) {
+      zBits.push(`${step.tableau.colNames[j]} aparece como ${this.fmt(step.tableau.zRow[j])}`);
+    }
+    const cards = [
+      ['Las holguras', holguras.length
+        ? `Cada restricción ≤ se vuelve igualdad sumando una h. Aquí empiezan en la base: ${holguras.join(', ')}.`
+        : 'Si hay ≥ o =, la base inicial usa excesos E y artificiales A. Esas artificiales tienen que valer 0 al final.'],
+      ['La fila Z', `La función objetivo se pasa al otro lado, por eso cambia de signo. ${zBits.join(' y ')}.`],
+      ['Cuándo parar', 'Mientras Z tenga un número negativo, se puede mejorar. Cuando ya no quede ninguno, esa tabla es la solución.'],
+    ];
+    cards.forEach(([title, body]) => {
+      const card = el('article', { className: 'guide-card' });
+      card.append(el('p', { className: 'beat-kicker', text: title }));
+      card.append(el('p', { className: 'beat-text', text: body }));
+      guide.append(card);
+    });
+    const wrap = el('div', { className: 'walk-block' });
+    wrap.append(guide);
+    const setup = (step.notes || []).filter((n) => n && !/optimalidad|coeficiente más negativo/i.test(n));
+    if (setup.length) {
+      const note = el('div', { className: 'setup-notes' });
+      setup.forEach((n) => note.append(el('p', { text: n })));
+      wrap.append(note);
+    }
+    return wrap;
+  }
+
+  renderRatioBoard(step) {
+    const board = el('div', { className: 'ratio-board' });
+    const winner = step.ratios.find((r) => r.row === step.pivotRow);
+    const tied = !!(winner?.ratio && step.ratios.some((r) => (
+      r.eligible && r.row !== winner.row && r.ratio && r.ratio.equals(winner.ratio)
+    )));
+    step.ratios.forEach((r) => {
+      const isBest = step.pivotRow === r.row;
+      const chip = el('div', { className: `ratio-chip${isBest ? ' is-winner' : ''}${r.eligible ? '' : ' is-skip'}` });
+      chip.append(el('span', { className: 'ratio-who', text: r.basic }));
+      if (r.eligible && r.rhs && r.coef) {
+        chip.append(el('span', { className: 'ratio-math', text: `${this.fmt(r.rhs)} ÷ ${this.fmt(r.coef)}` }));
+        chip.append(el('span', { className: 'ratio-eq', text: `= ${this.fmt(r.ratio)}` }));
+        chip.append(el('span', {
+          className: 'ratio-tag',
+          text: isBest
+            ? (tied ? 'Sale · hay empate y se elige esta' : 'Sale · es la razón menor')
+            : 'Se queda',
+        }));
+      } else {
+        chip.append(el('span', {
+          className: 'ratio-tag',
+          text: r.coef && r.coef.isZero()
+            ? 'No participa · el coeficiente es 0'
+            : 'No participa · el coeficiente no es positivo',
+        }));
+      }
+      board.append(chip);
+    });
+    return board;
+  }
+
+  /** Misma aritmética que el pivote del motor, solo para mostrar los números. */
+  rowWork(before, pivotRow, pivotCol) {
+    const names = [...before.colNames, 'L.D.'];
+    const pack = (cells, rhs) => [...cells, rhs];
+    const p = before.matrix[pivotRow][pivotCol].c;
+    const newPivot = before.matrix[pivotRow].map((c) => c.div(p));
+    const newRhs = before.rhs[pivotRow].div(p);
+    const works = [{
+      kind: 'div',
+      sign: `÷ ${this.fmt(p)}`,
+      fromLabel: `Fila ${before.basic[pivotRow]}`,
+      from: pack(before.matrix[pivotRow], before.rhs[pivotRow]),
+      to: pack(newPivot, newRhs),
+    }];
+
+    for (let i = 0; i < before.matrix.length; i++) {
+      if (i === pivotRow) continue;
+      const factor = before.matrix[i][pivotCol].c;
+      if (factor.isZero()) continue;
+      const shown = factor.isNegative() ? factor.neg() : factor;
+      const toCells = before.matrix[i].map((c, j) => c.sub(newPivot[j].mul(factor)));
+      const toRhs = before.rhs[i].sub(newRhs.mul(factor));
+      works.push({
+        kind: factor.isNegative() ? 'add' : 'sub',
+        sign: `${factor.isNegative() ? '+' : '−'} ${this.fmt(shown)} ×`,
+        fromLabel: `Fila ${before.basic[i]}`,
+        from: pack(before.matrix[i], before.rhs[i]),
+        midLabel: 'Fila pivote',
+        mid: pack(newPivot, newRhs),
+        to: pack(toCells, toRhs),
+      });
+    }
+
+    const zFactor = before.zRow[pivotCol];
+    if (!zFactor.isZero()) {
+      const shown = zFactor.isNegative() ? zFactor.neg() : zFactor;
+      const toZ = before.zRow.map((c, j) => {
+        const pr = newPivot[j].c;
+        return c.sub(new BigCoeff(zFactor.m.mul(pr), zFactor.c.mul(pr)));
+      });
+      const prRhs = newRhs.c;
+      const toZRhs = before.zRhs.sub(new BigCoeff(zFactor.m.mul(prRhs), zFactor.c.mul(prRhs)));
+      works.push({
+        kind: zFactor.isNegative() ? 'add' : 'sub',
+        sign: `${zFactor.isNegative() ? '+' : '−'} ${this.fmt(shown)} ×`,
+        fromLabel: 'Fila Z',
+        from: pack(before.zRow, before.zRhs),
+        midLabel: 'Fila pivote',
+        mid: pack(newPivot, newRhs),
+        to: pack(toZ, toZRhs),
+      });
+    }
+    return { names, focus: pivotCol, works };
+  }
+
+  numRow(names, values, focus, mode) {
+    const row = el('div', { className: 'num-row' });
+    values.forEach((value, j) => {
+      const cell = el('span', { className: 'num-cell' });
+      if (j === names.length - 1) cell.classList.add('is-ld');
+      if (focus != null && j === focus && mode) cell.classList.add(mode);
+      cell.append(el('span', { className: 'num-name', text: names[j] }));
+      cell.append(el('span', { className: 'num-val', text: this.fmt(value) }));
+      row.append(cell);
+    });
+    return row;
+  }
+
+  renderOpsList(step) {
+    const ol = el('ol', { className: 'ops-list' });
+    const before = step.meta?.before;
+    const canShow = before && step.pivotRow != null && step.pivotCol != null;
+    const worked = canShow ? this.rowWork(before, step.pivotRow, step.pivotCol) : null;
+    step.rowOps.forEach((op, i) => {
+      const formula = typeof op === 'string' ? op : op.formula;
+      const why = typeof op === 'string' ? '' : op.why;
+      let title = 'Esta fila queda en 0';
+      if (i === 0) title = 'El pivote pasa a 1';
+      else if (String(formula).includes('Fila Z')) title = 'En Z, esa columna queda en 0';
+      const li = el('li', { style: `animation-delay:${i * 70}ms` });
+      li.append(el('span', { className: 'op-num', text: String(i + 1) }));
+      const body = el('div', { className: 'op-body' });
+      body.append(el('p', { className: 'op-kicker', text: title }));
+      body.append(el('p', { className: 'op-formula', text: formula }));
+      if (why) body.append(el('p', { className: 'op-why', text: why }));
+      const work = worked?.works[i];
+      if (work) {
+        const box = el('div', { className: 'op-work' });
+        const from = el('div', { className: 'op-line' });
+        from.append(el('span', { className: 'op-line-label', text: work.fromLabel }));
+        from.append(this.numRow(worked.names, work.from, worked.focus, i === 0 ? 'is-pivot' : 'is-watch'));
+        box.append(from);
+        if (work.mid) {
+          const mid = el('div', { className: 'op-line' });
+          mid.append(el('span', { className: 'op-line-label', text: work.sign }));
+          const midBody = el('div', { className: 'op-mid' });
+          midBody.append(el('span', { className: 'op-mid-name', text: work.midLabel }));
+          midBody.append(this.numRow(worked.names, work.mid, worked.focus, 'is-pivot'));
+          mid.append(midBody);
+          box.append(mid);
+        } else {
+          const sign = el('div', { className: 'op-line' });
+          sign.append(el('span', { className: 'op-line-label is-sign', text: work.sign }));
+          box.append(sign);
+        }
+        const to = el('div', { className: 'op-line is-result' });
+        to.append(el('span', { className: 'op-line-label', text: 'Queda' }));
+        to.append(this.numRow(worked.names, work.to, worked.focus, i === 0 ? 'is-pivot' : 'is-zero'));
+        box.append(to);
+        body.append(box);
+      }
+      li.append(body);
+      ol.append(li);
+    });
+    return ol;
+  }
+
+  renderCheckpoint(step, result) {
+    const box = el('div', { className: 'checkpoint' });
+    const negs = this.zNegatives(step.tableau);
+    let kind = 'is-wait';
+    let title = 'Todavía no es óptimo';
+    let text = '';
+
+    if (step.status === 'optimal' || step.status === 'alternate') {
+      kind = 'is-done';
+      title = step.status === 'alternate' ? 'Hay más de una solución óptima' : 'Llegamos al óptimo';
+      text = 'En la fila Z ya no hay números negativos. Las variables de la base valen lo que dice L.D. Las que no están en la base valen 0.';
+    } else if (step.status === 'unbounded') {
+      kind = 'is-stop';
+      title = 'Z no tiene límite';
+      text = step.entering
+        ? `${step.entering} mejoraría Z, pero en su columna no hay ningún coeficiente positivo. No se puede armar una razón, así que no hay un óptimo finito.`
+        : 'No hay un óptimo finito: Z puede seguir mejorando.';
+    } else if (step.status === 'infeasible') {
+      kind = 'is-stop';
+      title = 'Las restricciones no se pueden cumplir juntas';
+      text = 'Quedó una variable artificial con valor positivo. No existe una solución con todas las xⱼ ≥ 0.';
+    } else if (!step.entering) {
+      title = negs.length ? 'Ahora toca elegir quién entra' : 'Esta tabla ya no mejora';
+      text = negs.length
+        ? `En Z todavía hay ${negs.map((n) => `${this.fmt(n.coef)} en ${n.name}`).join(', ')}. Pulsa Siguiente.`
+        : 'Pulsa Siguiente para ver el cierre de este caso.';
+    } else if (negs.length) {
+      text = `Después de este pivote, en Z sigue habiendo negativo: ${negs.map((n) => `${this.fmt(n.coef)} en ${n.name}`).join(', ')}. Pulsa Siguiente.`;
+    } else {
+      kind = 'is-done';
+      title = 'La fila Z ya no tiene negativos';
+      text = 'Con esta tabla se cierra el procedimiento.';
+    }
+
+    box.classList.add(kind);
+    box.append(el('p', { className: 'checkpoint-title', text: title }));
+    if (text) box.append(el('p', { className: 'beat-text', text }));
+
+    if (step.status === 'optimal' || step.status === 'alternate') {
+      const list = el('ul', { className: 'answer-list' });
+      for (let i = 0; i < result.numVars; i++) {
+        const name = step.tableau.colNames[i];
+        const row = step.tableau.basic.indexOf(name);
+        const value = row >= 0 ? this.fmt(step.tableau.rhs[row]) : '0';
+        const li = el('li');
+        li.append(el('span', { text: name }));
+        li.append(el('span', { className: 'key-val', text: value }));
+        list.append(li);
+      }
+      const zShow = result.originalSense === 'min' ? this.fmt(result.z) : this.fmt(step.tableau.zRhs);
+      const zLi = el('li');
+      zLi.append(el('span', { text: 'Z' }));
+      zLi.append(el('span', { className: 'key-val', text: zShow }));
+      list.append(zLi);
+      box.append(list);
+      if (result.originalSense === 'min') {
+        box.append(el('p', {
+          className: 'beat-text',
+          text: `En la tabla, el L.D. de Z es ${this.fmt(step.tableau.zRhs)} porque se maximizó −Z. El valor del problema es ${zShow}.`,
+        }));
+      }
+    }
+
+    const extras = (step.notes || []).filter((n) => /empate|Bland|degener/i.test(n));
+    extras.forEach((n) => box.append(el('p', { className: 'beat-text', text: n })));
+    return box;
   }
 
   renderStep(root, result) {
     const idx = this.state.stepIndex;
     const step = result.steps[idx];
     const total = result.steps.length;
-    const explained = explainStep(step, idx, total);
     const pct = total > 1 ? Math.round((idx / (total - 1)) * 100) : 100;
 
-    // Chrome bar
     const chrome = el('div', { className: 'step-chrome' });
     const prog = el('div', { className: 'step-progress' });
-    prog.append(document.createTextNode(`${explained.progress}`));
+    prog.append(document.createTextNode(`Paso ${idx + 1} de ${total}`));
     prog.append(el('span', { text: step.title }));
     chrome.append(prog);
 
@@ -850,145 +1190,79 @@ export class AppUI {
     pbWrap.append(pbTrack);
     root.append(pbWrap);
 
-    // Pivot cards
+    if (idx === 0 && !step.entering) root.append(this.renderStartGuide(step, result));
+
+    const beforeTableau = step.meta?.before && step.pivotCol != null ? step.meta.before : null;
+    const source = beforeTableau || step.tableau;
+    let enterCoef = null;
+    if (step.entering && step.pivotCol != null) {
+      enterCoef = source.zRow[step.pivotCol];
+    }
+
+    root.append(this.renderTableau(source, {
+      pivotCol: step.pivotCol,
+      pivotRow: beforeTableau ? step.pivotRow : null,
+      showNegZ: true,
+      ratios: step.ratios,
+    }, beforeTableau ? 'Tabla de este paso' : step.title));
+
+    if (step.pivotCol != null && step.pivotRow != null) {
+      root.append(el('p', {
+        className: 'table-hint',
+        text: 'La columna verde es la que entra. La fila azul es la que sale. La celda oscura es el pivote.',
+      }));
+    }
+
+    const walk = el('div', { className: 'walk' });
+    let n = 1;
+    if (step.entering && enterCoef) {
+      walk.append(this.beat(
+        n,
+        'Quién entra',
+        `Entra ${step.entering}`,
+        `En la fila Z, el número más negativo es ${this.fmt(enterCoef)}. Está en la columna ${step.entering}. Esa es la variable que más mejora Z.`,
+      ));
+      n += 1;
+    }
+    if (step.ratios?.length) {
+      const ratioText = step.pivotRow == null
+        ? `La razón es L.D. ÷ el coeficiente de ${step.entering || 'la columna'}. Solo vale si ese coeficiente es positivo.`
+        : `En la columna de ${step.entering} se divide el lado derecho entre el coeficiente. La razón más pequeña dice quién sale.`;
+      walk.append(this.beat(n, 'Prueba de razón', 'L.D. ÷ coeficiente', ratioText, this.renderRatioBoard(step)));
+      n += 1;
+    }
     if (step.entering || step.leaving || step.pivotValue) {
       const cards = el('div', { className: 'pivot-cards' });
       cards.append(
-        this.makePivotCard('Variable entrante', step.entering || '—', 'is-enter'),
-        this.makePivotCard('Variable saliente', step.leaving || '—', 'is-leave'),
-        this.makePivotCard('Elemento pivote', step.pivotValue ? this.fmt(step.pivotValue) : '—', 'is-pivot'),
+        this.makePivotCard('Entra', step.entering || '—', 'is-enter', 'La más negativa de Z'),
+        this.makePivotCard('Sale', step.leaving || '—', 'is-leave', step.leaving ? 'La razón más pequeña' : 'No hay fila que pueda salir'),
+        this.makePivotCard('Pivote', step.pivotValue ? this.fmt(step.pivotValue) : '—', 'is-pivot', 'Donde se cruzan fila y columna'),
       );
-      root.append(cards);
+      walk.append(cards);
     }
-
-    // Explain box
-    const box = el('div', { className: 'explain-box' });
-    explained.paragraphs.forEach((p) => box.append(el('p', { text: p })));
-    root.append(box);
-
-    // Tables
-    const beforeTableau = step.meta?.before && step.pivotCol != null ? step.meta.before : null;
-    const next = result.steps[idx + 1];
-    if (beforeTableau) {
-      root.append(this.renderTableau(beforeTableau, {
-        pivotCol: step.pivotCol,
-        pivotRow: step.pivotRow,
-        showNegZ: true,
-        ratios: step.ratios,
-      }, 'Tabla antes del pivote'));
-      root.append(this.renderTableau(step.tableau, {
-        showNegZ: true,
-        ratios: next?.ratios || null,
-      }, 'Tabla después del pivote'));
-    } else {
-      root.append(this.renderTableau(step.tableau, {
-        pivotCol: step.pivotCol,
-        pivotRow: step.pivotRow,
-        showNegZ: true,
-        ratios: step.ratios || next?.ratios || null,
-      }, step.title));
-    }
-
-    // Ratio test
-    if (step.ratios) {
-      root.append(el('p', { className: 'results-section-title', text: 'Prueba de razón' }));
-      const entering = step.entering || 'la variable que entra';
-      root.append(el('p', {
-        className: 'section-help',
-        text: `En la columna de ${entering} solo cuentan las filas con coeficiente positivo. La razón es L.D. ÷ ese coeficiente. La razón más pequeña indica la variable que sale.`,
-      }));
-      const scroll = el('div', { className: 'ratio-scroll' });
-      const rt = el('table', { className: 'ratio-table' });
-      rt.append(el('thead', {}, [
-        el('tr', {}, [
-          el('th', { text: 'Variable' }),
-          el('th', { text: 'Cálculo' }),
-          el('th', { text: 'Razón' }),
-          el('th', { text: 'Qué pasa' }),
-        ]),
-      ]));
-      const tb = el('tbody');
-      const winner = step.ratios.find((r) => r.row === step.pivotRow);
-      const tied = !!(winner?.ratio && step.ratios.some((r) => (
-        r.eligible && r.row !== winner.row && r.ratio && r.ratio.equals(winner.ratio)
-      )));
-      step.ratios.forEach((r) => {
-        const isBest = step.pivotRow === r.row;
-        let calc = '—';
-        if (r.eligible && r.rhs && r.coef) {
-          calc = `${this.fmt(r.rhs)} ÷ ${this.fmt(r.coef)}`;
-        }
-        let decision = r.note;
-        if (r.eligible) {
-          decision = isBest
-            ? (tied ? `Sale ${r.basic} (empate; se elige esta)` : `Sale ${r.basic}: es la razón menor`)
-            : 'Se queda en la base';
-        }
-        tb.append(el('tr', { className: isBest ? 'is-best' : '' }, [
-          el('td', { text: r.basic }),
-          el('td', { text: calc }),
-          el('td', { text: r.ratio ? this.fmt(r.ratio) : '—' }),
-          el('td', { text: decision }),
-        ]));
-      });
-      rt.append(tb);
-      scroll.append(rt);
-      root.append(scroll);
-    }
-
     if (step.rowOps?.length) {
-      root.append(el('p', { className: 'results-section-title', text: 'Operaciones de fila' }));
-      root.append(el('p', {
-        className: 'section-help',
-        text: 'Primero se deja el pivote en 1. Después cada otra fila se combina con la fila pivote para que, en la columna que entra, quede 0.',
-      }));
-      const ol = el('ol', { className: 'ops-list' });
-      step.rowOps.forEach((op, i) => {
-        const formula = typeof op === 'string' ? op : op.formula;
-        const why = typeof op === 'string' ? '' : op.why;
-        const li = el('li', { style: `animation-delay: ${i * 60}ms` });
-        li.append(el('span', { className: 'op-num', text: String(i + 1) }));
-        const body = el('div', { className: 'op-body' });
-        body.append(el('p', { className: 'op-formula', text: formula }));
-        if (why) body.append(el('p', { className: 'op-why', text: why }));
-        li.append(body);
-        ol.append(li);
-      });
-      root.append(ol);
+      walk.append(this.beat(
+        n,
+        'Operaciones de fila',
+        'Así se arma la tabla nueva',
+        'Primero el pivote queda en 1. Después, en cada otra fila, esa columna queda en 0.',
+        this.renderOpsList(step),
+      ));
+    }
+    if (walk.childNodes.length) root.append(walk);
+
+    if (beforeTableau && step.rowOps?.length) {
+      root.append(this.renderTableau(step.tableau, { showNegZ: true }, 'Tabla que queda'));
     }
 
-    // Mini-grafo sticky — solo con 2 variables
-    if (this.state.problemSnapshot?.numVars === 2) {
-      const miniWrap = el('div', { className: 'mini-graph-wrap' });
-      const miniCard = el('div', { className: 'result-card' });
-      const miniTitle = el('p', { className: 'results-section-title', text: `Gráfico — paso ${idx + 1}` });
-      miniCard.append(miniTitle);
-      const host = el('div', { className: 'graph-wrap is-mini' });
-      miniCard.append(host);
-      miniWrap.append(miniCard);
-      root.append(miniWrap);
-
-      const region = computeFeasibleRegion(this.state.problemSnapshot);
-      const partialResult = { ...result, steps: result.steps.slice(0, idx + 1) };
-      const path = extractSimplexPath(partialResult);
-      // Vértice actual = último punto del path
-      const currentVertex = path.length > 0 ? path[path.length - 1] : null;
-      renderGraph(host, region, {
-        path,
-        optimalPoint:
-          (result.status === 'optimal' || result.status === 'alternate')
-            ? { x: result.values[0].toNumber(), y: result.values[1].toNumber() }
-            : null,
-        unbounded: result.status === 'unbounded',
-        currentVertex,
-      });
-    }
+    root.append(this.renderCheckpoint(step, result));
   }
 
-  makePivotCard(label, value, cls) {
+  makePivotCard(label, value, cls, hint) {
     const card = el('div', { className: `pivot-card ${cls}` });
     card.append(el('div', { className: 'pc-label', text: label }));
     card.append(el('div', { className: 'pc-value', text: value }));
+    if (hint) card.append(el('p', { className: 'pc-hint', text: hint }));
     return card;
   }
 
@@ -1009,16 +1283,29 @@ export class AppUI {
       });
       title.setAttribute('data-num', String(i + 1));
       block.append(title);
-      const explained = explainStep(step, i, result.steps.length);
-      const box = el('div', { className: 'explain-box' });
-      explained.paragraphs.forEach((p) => box.append(el('p', { text: p })));
-      block.append(box);
-      block.append(this.renderTableau(step.tableau, {
-        pivotCol: step.pivotCol,
-        pivotRow: step.pivotRow,
-        showNegZ: true,
-        ratios: result.steps[i + 1]?.ratios || (step.pivotRow == null ? step.ratios : null),
-      }));
+      if (i === 0 && !step.entering) block.append(this.renderStartGuide(step, result));
+      const beforeTableau = step.meta?.before && step.pivotCol != null ? step.meta.before : null;
+      if (beforeTableau) {
+        block.append(this.renderTableau(beforeTableau, {
+          pivotCol: step.pivotCol,
+          pivotRow: step.pivotRow,
+          showNegZ: true,
+          ratios: step.ratios,
+        }, 'Tabla de este paso'));
+      }
+      if (step.ratios?.length) {
+        const boardBeat = this.beat(1, 'Prueba de razón', step.entering ? `Entra ${step.entering}` : 'Razones', step.leaving
+          ? `Sale ${step.leaving}. La razón menor es la que deja la base.`
+          : 'Ninguna fila tiene coeficiente positivo, así que no hay quién salga.', this.renderRatioBoard(step));
+        block.append(boardBeat);
+      }
+      if (step.rowOps?.length) {
+        block.append(this.beat(2, 'Operaciones de fila', 'Así cambia la tabla', 'El pivote pasa a 1 y el resto de esa columna pasa a 0.', this.renderOpsList(step)));
+      }
+      if (!beforeTableau || step.rowOps?.length) {
+        block.append(this.renderTableau(step.tableau, { showNegZ: true }, beforeTableau ? 'Tabla que queda' : step.title));
+      }
+      block.append(this.renderCheckpoint(step, result));
       wrap.append(block);
     });
     root.append(wrap);

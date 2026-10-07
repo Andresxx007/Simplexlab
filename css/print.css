@@ -66,6 +66,62 @@ main { width: 100% !important; padding: 0 !important; }
 .view[hidden] { display: none !important; }
 #view-resolver { display: block !important; }
 
+body:has(#print-sheet) > *:not(#print-sheet) { display: none !important; }
+#print-sheet {
+  display: block !important;
+  color: #000 !important;
+  background: #fff !important;
+  font-size: 11pt;
+  line-height: 1.45;
+}
+#print-sheet h1 {
+  margin: 0 0 2mm;
+  font-size: 18pt;
+  line-height: 1.2;
+}
+#print-sheet h2 {
+  margin: 0 0 3mm;
+  font-size: 13pt;
+  line-height: 1.25;
+}
+.pdf-head { margin-bottom: 6mm; padding-bottom: 3mm; border-bottom: 1.5pt solid #111; }
+.pdf-brand, .pdf-date, .pdf-kicker, .pdf-note { margin: 0 0 1.5mm; color: #222 !important; }
+.pdf-brand { font-size: 9pt; letter-spacing: .04em; text-transform: uppercase; }
+.pdf-eq, .pdf-status { margin: 0 0 2mm; font-size: 13pt; font-weight: 700; }
+.pdf-block { margin: 0 0 7mm; }
+.pdf-problem, .pdf-answer { break-inside: avoid; }
+.pdf-cons, .pdf-values { margin: 0 0 2mm; padding-left: 5mm; }
+.pdf-cons li, .pdf-values li { margin: 0 0 1mm; }
+.pdf-values .is-z { font-weight: 700; }
+#print-sheet .step-block { break-inside: auto; margin-bottom: 8mm; }
+#print-sheet .step-block-title,
+#print-sheet .table-wrap,
+#print-sheet .ops-list li,
+#print-sheet .checkpoint,
+#print-sheet .beat,
+#print-sheet .guide-card,
+#print-sheet .pivot-cards { break-inside: avoid; }
+#print-sheet .step-block-title { break-after: avoid; }
+#print-sheet .simplex-table { font-size: 9.5pt; }
+#print-sheet .simplex-table th,
+#print-sheet .simplex-table td,
+#print-sheet .num-cell {
+  background: #fff !important;
+  color: #000 !important;
+  border: 1px solid #bbb !important;
+}
+#print-sheet .simplex-table td.is-pivot-cell,
+#print-sheet .num-cell.is-pivot {
+  border: 2px solid #111 !important;
+  font-weight: 700;
+}
+#print-sheet .num-cell.is-pivot .num-name,
+#print-sheet .num-cell.is-pivot .num-val,
+#print-sheet .num-cell.is-zero .num-name,
+#print-sheet .num-cell.is-zero .num-val { color: #000 !important; }
+#print-sheet .walk::before { background: #ccc; }
+.result-tools, .btn-pdf, .pdf-hint { display: none !important; }
+
 *, *::before, *::after {
   animation: none !important;
   transition: none !important;

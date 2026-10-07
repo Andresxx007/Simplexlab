@@ -466,6 +466,11 @@ export function solve(problem, options = {}) {
             'Optimalidad alcanzada: no quedan coeficientes negativos en la fila Z.'
           );
         }
+        if (norm.originalSense === 'min' && tableau.zRhs.m.isZero()) {
+          steps[steps.length - 1].notes.push(
+            `La fila Z de la tabla maximiza −Z, por eso su L.D. es ${tableau.zRhs.toString()}. El valor original del mínimo es Z = ${tableau.zRhs.neg().toString()}.`
+          );
+        }
       }
       break;
     }
