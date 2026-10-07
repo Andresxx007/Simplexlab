@@ -884,12 +884,16 @@ export class AppUI {
 
   beat(n, kicker, title, text, extra) {
     const card = el('div', { className: 'beat-card' });
-    card.append(el('p', { className: 'beat-kicker', text: kicker }));
-    if (title) card.append(el('p', { className: 'beat-title', text: title }));
+    const head = el('div', { className: 'beat-head' });
+    head.append(el('span', { className: 'beat-index', text: String(n), 'aria-hidden': 'true' }));
+    const titles = el('div', { className: 'beat-head-text' });
+    titles.append(el('p', { className: 'beat-kicker', text: kicker }));
+    if (title) titles.append(el('p', { className: 'beat-title', text: title }));
+    head.append(titles);
+    card.append(head);
     if (text) card.append(el('p', { className: 'beat-text', text }));
     if (extra) card.append(extra);
     const row = el('section', { className: 'beat', style: `animation-delay:${(n - 1) * 80}ms` });
-    row.append(el('span', { className: 'beat-index', text: String(n), 'aria-hidden': 'true' }));
     row.append(card);
     return row;
   }
@@ -1047,11 +1051,14 @@ export class AppUI {
       if (i === 0) title = 'El pivote pasa a 1';
       else if (String(formula).includes('Fila Z')) title = 'En Z, esa columna queda en 0';
       const li = el('li', { style: `animation-delay:${i * 70}ms` });
-      li.append(el('span', { className: 'op-num', text: String(i + 1) }));
+      const head = el('div', { className: 'op-head' });
+      head.append(el('span', { className: 'op-num', text: String(i + 1) }));
       const body = el('div', { className: 'op-body' });
       body.append(el('p', { className: 'op-kicker', text: title }));
       body.append(el('p', { className: 'op-formula', text: formula }));
       if (why) body.append(el('p', { className: 'op-why', text: why }));
+      head.append(body);
+      li.append(head);
       const work = worked?.works[i];
       if (work) {
         const box = el('div', { className: 'op-work' });
@@ -1076,9 +1083,8 @@ export class AppUI {
         to.append(el('span', { className: 'op-line-label', text: 'Queda' }));
         to.append(this.numRow(worked.names, work.to, worked.focus, i === 0 ? 'is-pivot' : 'is-zero'));
         box.append(to);
-        body.append(box);
+        li.append(box);
       }
-      li.append(body);
       ol.append(li);
     });
     return ol;
@@ -1313,12 +1319,11 @@ export class AppUI {
 
   renderTableau(tableau, highlight = {}, caption = null) {
     const hasPivot = highlight.pivotCol != null && highlight.pivotRow != null;
+    const block = el('div', { className: 'table-block' });
     const wrap = el('div', { className: 'table-wrap' });
 
     // Cabecera de la tabla con botón pivot-focus (solo si hay pivote)
-    const header = el('div', {
-      style: 'display:flex; align-items:center; justify-content:space-between; padding: 0.55rem 1rem 0;',
-    });
+    const header = el('div', { className: 'table-head' });
     if (caption) {
       header.append(el('div', { className: 'table-caption', style: 'padding:0', text: caption }));
     } else {
@@ -1337,7 +1342,11 @@ export class AppUI {
       });
       header.append(focusBtn);
     }
-    wrap.append(header);
+    block.append(header);
+    block.append(el('p', {
+      className: 'table-scroll-hint',
+      text: 'Si falta alguna columna, deslice la tabla hacia el lado.',
+    }));
 
     const table = el('table', { className: 'simplex-table' });
     const thead = el('thead');
@@ -1401,7 +1410,8 @@ export class AppUI {
 
     table.append(tbody);
     wrap.append(table);
-    return wrap;
+    block.append(wrap);
+    return block;
   }
 
   // ── Examples ─────────────────────────────────────────────

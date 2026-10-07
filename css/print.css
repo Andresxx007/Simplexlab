@@ -120,7 +120,7 @@ body:has(#print-sheet) > *:not(#print-sheet) { display: none !important; }
 #print-sheet .num-cell.is-zero .num-name,
 #print-sheet .num-cell.is-zero .num-val { color: #000 !important; }
 #print-sheet .walk::before { background: #ccc; }
-.result-tools, .btn-pdf, .pdf-hint { display: none !important; }
+.result-tools, .btn-pdf, .pdf-hint, .table-scroll-hint { display: none !important; }
 
 *, *::before, *::after {
   animation: none !important;
