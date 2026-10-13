@@ -97,6 +97,7 @@ body:has(#print-sheet) > *:not(#print-sheet) { display: none !important; }
 #print-sheet .step-block-title,
 #print-sheet .table-wrap,
 #print-sheet .ops-list li,
+#print-sheet .calc-row,
 #print-sheet .checkpoint,
 #print-sheet .beat,
 #print-sheet .guide-card,
@@ -115,6 +116,16 @@ body:has(#print-sheet) > *:not(#print-sheet) { display: none !important; }
   border: 2px solid #111 !important;
   font-weight: 700;
 }
+#print-sheet .calc-board {
+  background: #fff !important;
+  border: 1px solid #bbb !important;
+}
+#print-sheet .calc-row.is-focus { box-shadow: inset 3px 0 0 #111; }
+#print-sheet .calc-expr,
+#print-sheet .calc-res,
+#print-sheet .calc-col,
+#print-sheet .calc-note,
+#print-sheet .calc-title { color: #111 !important; }
 #print-sheet .num-cell.is-pivot .num-name,
 #print-sheet .num-cell.is-pivot .num-val,
 #print-sheet .num-cell.is-zero .num-name,

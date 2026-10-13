@@ -981,6 +981,7 @@ export class AppUI {
     const works = [{
       kind: 'div',
       sign: `÷ ${this.fmt(p)}`,
+      divisor: p,
       fromLabel: `Fila ${before.basic[pivotRow]}`,
       from: pack(before.matrix[pivotRow], before.rhs[pivotRow]),
       to: pack(newPivot, newRhs),
@@ -996,6 +997,7 @@ export class AppUI {
       works.push({
         kind: factor.isNegative() ? 'add' : 'sub',
         sign: `${factor.isNegative() ? '+' : '−'} ${this.fmt(shown)} ×`,
+        factor: shown,
         fromLabel: `Fila ${before.basic[i]}`,
         from: pack(before.matrix[i], before.rhs[i]),
         midLabel: 'Fila pivote',
@@ -1016,6 +1018,7 @@ export class AppUI {
       works.push({
         kind: zFactor.isNegative() ? 'add' : 'sub',
         sign: `${zFactor.isNegative() ? '+' : '−'} ${this.fmt(shown)} ×`,
+        factor: shown,
         fromLabel: 'Fila Z',
         from: pack(before.zRow, before.zRhs),
         midLabel: 'Fila pivote',
@@ -1024,6 +1027,34 @@ export class AppUI {
       });
     }
     return { names, focus: pivotCol, works };
+  }
+
+  factorText(value) {
+    const text = this.fmt(value);
+    return /[\s+]/.test(text) ? `(${text})` : text;
+  }
+
+  renderCalc(work, names, focus) {
+    const board = el('div', { className: 'calc-board' });
+    const note = work.kind === 'div'
+      ? `Cada número de la fila se divide entre ${this.fmt(work.divisor)}.`
+      : 'En cada columna se usa el número de la fila y el de la fila pivote.';
+    board.append(el('p', { className: 'calc-title', text: 'Número por número' }));
+    board.append(el('p', { className: 'calc-note', text: note }));
+    names.forEach((name, j) => {
+      const row = el('div', { className: 'calc-row' });
+      if (j === focus) row.classList.add('is-focus');
+      if (j === names.length - 1) row.classList.add('is-ld');
+      const expr = work.kind === 'div'
+        ? `${this.fmt(work.from[j])} ÷ ${this.fmt(work.divisor)}`
+        : `${this.fmt(work.from[j])} ${work.kind === 'add' ? '+' : '−'} ${this.factorText(work.factor)} × ${this.fmt(work.mid[j])}`;
+      row.append(el('span', { className: 'calc-col', text: name }));
+      row.append(el('span', { className: 'calc-expr', text: expr }));
+      row.append(el('span', { className: 'calc-arrow', text: '→', 'aria-hidden': 'true' }));
+      row.append(el('span', { className: 'calc-res', text: this.fmt(work.to[j]) }));
+      board.append(row);
+    });
+    return board;
   }
 
   numRow(names, values, focus, mode) {
@@ -1083,6 +1114,7 @@ export class AppUI {
         to.append(el('span', { className: 'op-line-label', text: 'Queda' }));
         to.append(this.numRow(worked.names, work.to, worked.focus, i === 0 ? 'is-pivot' : 'is-zero'));
         box.append(to);
+        box.append(this.renderCalc(work, worked.names, worked.focus));
         li.append(box);
       }
       ol.append(li);
