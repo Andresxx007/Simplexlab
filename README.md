@@ -1,6 +1,6 @@
-# SimplexLab
+# IOLab
 
-Aplicación web educativa para resolver problemas de programación lineal con el **método Simplex** (M grande), explicando cada paso.
+Aplicación web educativa de programación lineal para Investigación de Operaciones. Resuelve el mismo modelo con el **método gráfico** (dos variables) y el **método Simplex** (M grande), explicando cada paso.
 
 Todo corre en el navegador: HTML, CSS y JavaScript puro. Sin dependencias externas ni servidor de backend.
 

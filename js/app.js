@@ -1,5 +1,5 @@
 /**
- * Punto de entrada de SimplexLab.
+ * Punto de entrada de IOLab.
  */
 
 import { AppUI } from './ui.js';

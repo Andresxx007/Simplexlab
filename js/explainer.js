@@ -149,6 +149,12 @@ export function explainSolution(result, displayMode = 'fraction') {
 }
 
 export const GLOSSARY = {
+  'región factible':
+    'Conjunto de puntos que cumplen todas las restricciones a la vez, incluido xⱼ ≥ 0. Si está vacío, el problema es infactible.',
+  vértice:
+    'Esquina de la región factible. Si hay un óptimo finito, se alcanza en uno de estos puntos.',
+  reducción:
+    'Método para hallar el cruce de dos rectas: se igualan coeficientes, se suma o se resta, y se sustituye el valor en una ecuación.',
   holgura:
     'Variable h que convierte una restricción ≤ en igualdad (h₁, h₂, …). Si vale más que cero, el recurso sobra. En la base inicial entran las holguras.',
   exceso:

@@ -5,6 +5,27 @@
 
 export const EXAMPLES = [
   {
+    id: 'reduccion',
+    title: 'Reducción',
+    level: 'Introducción',
+    illustrates: 'Cortes con los ejes y vértice por método de reducción',
+    statement: 'Maximizar 40X₁ + 50X₂ sujeto a X₁ + 2X₂ ≤ 50 y 4X₁ + 2X₂ ≤ 120.',
+    problem: {
+      sense: 'max',
+      numVars: 2,
+      objective: ['40', '50'],
+      constraints: [
+        { coeffs: ['1', '2'], op: '<=', rhs: '50' },
+        { coeffs: ['4', '2'], op: '<=', rhs: '120' },
+      ],
+    },
+    expected: {
+      status: 'optimal',
+      values: ['70/3', '40/3'],
+      z: '1600',
+    },
+  },
+  {
     id: 'basico',
     title: 'Básico',
     level: 'Introducción',

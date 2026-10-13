@@ -1,6 +1,6 @@
 /**
  * Animaciones visuales del hero (canvas). Sin dependencias.
- * “Video de fondo” del producto en paleta verde SimplexLab.
+ * “Video de fondo” del producto en paleta verde IOLab.
  */
 
 function prefersReducedMotion() {

@@ -11,6 +11,7 @@ import {
   loadHistory, saveHistoryItem, removeHistoryItem, clearHistory, storageAvailable,
 } from './storage.js';
 import { startHeroCanvas, startDemoCanvas } from './motion.js';
+import { mountGraphic } from './graphic-ui.js';
 
 const SUB = ['', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉', '₁₀'];
 
@@ -54,6 +55,15 @@ export class AppUI {
     this.renderExamples();
     this.renderGlossary();
     this.updatePreview();
+    this.graphic = mountGraphic({
+      getMode: () => this.state.displayMode,
+      setMode: (mode) => {
+        this.state.displayMode = mode;
+        const sel = document.getElementById('displayMode');
+        if (sel && sel.value !== mode) sel.value = mode;
+        if (this.state.result) this.renderResults();
+      },
+    });
     // Start on landing
     this.showView('inicio');
   }
@@ -64,6 +74,7 @@ export class AppUI {
     const ids = {
       inicio:    'view-inicio',
       resolver:  'view-resolver',
+      grafico:   'view-grafico',
       ejemplos:  'view-ejemplos',
       teoria:    'view-teoria',
     };
@@ -100,6 +111,21 @@ export class AppUI {
     this._initReveal();
     this._initHeroParallax();
     this._initMotionCanvases();
+
+    document.querySelectorAll('[data-theory]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.theory;
+        document.querySelectorAll('[data-theory]').forEach((b) => {
+          const on = b === btn;
+          b.classList.toggle('is-active', on);
+          b.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        ['pl', 'grafico', 'simplex'].forEach((key) => {
+          const panel = document.getElementById(`theory-${key}`);
+          if (panel) panel.hidden = key !== id;
+        });
+      });
+    });
 
     // Sense toggle
     document.querySelectorAll('#sense-toggle .toggle-opt').forEach((btn) => {
@@ -150,7 +176,10 @@ export class AppUI {
 
     $('#displayMode').addEventListener('change', (e) => {
       this.state.displayMode = e.target.value;
+      const other = document.getElementById('g-displayMode');
+      if (other && other.value !== e.target.value) other.value = e.target.value;
       if (this.state.result) this.renderResults();
+      this.graphic?.rerender();
     });
 
     $('#btn-validate').addEventListener('click', () => this.validateOnly());
@@ -563,7 +592,7 @@ export class AppUI {
     const sheet = el('article', { id: 'print-sheet' });
 
     const head = el('header', { className: 'pdf-head' });
-    head.append(el('p', { className: 'pdf-brand', text: 'SimplexLab · Investigación de Operaciones · UEB' }));
+    head.append(el('p', { className: 'pdf-brand', text: 'IOLab · Investigación de Operaciones · UEB' }));
     head.append(el('h1', { text: 'Ejercicio resuelto' }));
     head.append(el('p', {
       className: 'pdf-date',
@@ -616,7 +645,7 @@ export class AppUI {
 
     document.body.append(sheet);
     const previousTitle = document.title;
-    document.title = 'SimplexLab — ejercicio resuelto';
+    document.title = 'IOLab — ejercicio resuelto';
     const cleanup = () => {
       sheet.remove();
       document.title = previousTitle;
@@ -1449,15 +1478,23 @@ export class AppUI {
   // ── Examples ─────────────────────────────────────────────
 
   renderExamples() {
-    const grid = $('#examples-grid');
-    grid.innerHTML = '';
-    EXAMPLES.forEach((ex) => {
+    const graphic = $('#examples-graphic');
+    const simplex = $('#examples-simplex');
+    if (!graphic || !simplex) return;
+    graphic.innerHTML = '';
+    simplex.innerHTML = '';
+    const cardFor = (ex, target) => {
       const levelClass = ex.level === 'Caso especial' ? 'level-especial'
         : ex.level === 'Avanzado' ? 'level-avanzado' : '';
       const card = el('button', {
         type: 'button',
         className: 'example-card',
         onClick: () => {
+          if (target === 'grafico' && this.graphic?.load) {
+            this.graphic.load(ex.problem);
+            this.showView('grafico');
+            return;
+          }
           this.loadProblem(ex.problem);
           this.showMessages([], `Ejemplo «${ex.title}» cargado. Pulse Resolver o Paso a paso.`);
           this.showView('resolver');
@@ -1467,7 +1504,11 @@ export class AppUI {
       card.append(el('h3', { text: ex.title }));
       card.append(el('p', { className: 'ex-statement', text: ex.statement }));
       card.append(el('p', { className: 'ex-illustrates', text: ex.illustrates }));
-      grid.append(card);
+      return card;
+    };
+    EXAMPLES.forEach((ex) => {
+      if (ex.problem.numVars === 2) graphic.append(cardFor(ex, 'grafico'));
+      simplex.append(cardFor(ex, 'simplex'));
     });
   }
 
