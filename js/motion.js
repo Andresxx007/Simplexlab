@@ -135,17 +135,20 @@ export function startDemoCanvas(canvas) {
   const path = [verts[0], verts[1], verts[2]];
 
   const resize = () => {
-    // El wrap fija el alto; no usar el body completo (evita crecer sin control en móvil)
     const box = canvas.parentElement;
     if (!box) return;
     const rect = box.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    w = Math.max(1, Math.floor(rect.width));
-    h = Math.max(1, Math.floor(rect.height));
+    const nw = Math.floor(rect.width);
+    const nh = Math.floor(rect.height);
+    if (nw < 20 || nh < 20) return;
+    if (nw === w && nh === h) return;
+    w = nw;
+    h = nh;
     canvas.width = Math.floor(w * dpr);
     canvas.height = Math.floor(h * dpr);
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   };
 
