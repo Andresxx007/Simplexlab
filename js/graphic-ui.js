@@ -228,73 +228,233 @@ export function mountGraphic({ getMode, setMode }) {
     return row;
   }
 
+  function note(text) {
+    return el('p', { className: 'beat-text', text });
+  }
+
+  function alg(text, kind) {
+    return el('p', { className: kind ? `alg is-${kind}` : 'alg', text });
+  }
+
+  function joinTerms(parts) {
+    const kept = parts.filter(Boolean);
+    if (!kept.length) return '0';
+    return kept.map((part, i) => {
+      if (i === 0) return part.neg ? `−${part.body}` : part.body;
+      return part.neg ? ` − ${part.body}` : ` + ${part.body}`;
+    }).join('');
+  }
+
+  function plainTerm(coef, name) {
+    if (!coef || coef.isZero()) return null;
+    const abs = coef.abs();
+    return {
+      neg: coef.isNegative(),
+      body: abs.equals(Fraction.one()) ? name : `${fmt(abs)}${name}`,
+    };
+  }
+
+  function pluggedTerm(coef, name, known, value) {
+    if (!coef || coef.isZero()) return null;
+    const abs = coef.abs();
+    return {
+      neg: coef.isNegative(),
+      body: known
+        ? (abs.equals(Fraction.one()) ? fmt(value) : `${fmt(abs)}(${fmt(value)})`)
+        : (abs.equals(Fraction.one()) ? name : `${fmt(abs)}${name}`),
+    };
+  }
+
+  function replacedTerm(coef, name, known, value) {
+    if (!coef || coef.isZero()) return null;
+    if (known) {
+      const product = coef.mul(value);
+      if (product.isZero()) return null;
+      return { neg: product.isNegative(), body: fmt(product.abs()) };
+    }
+    return plainTerm(coef, name);
+  }
+
+  function zTerm(coef, value) {
+    if (!coef || coef.isZero()) return '0';
+    if (coef.abs().equals(Fraction.one())) return fmt(value);
+    return `${fmt(coef.abs())}(${fmt(value)})`;
+  }
+
+  function zPlug(c1, c2, x, y) {
+    const left = c1.isNegative() ? `−${zTerm(c1, x)}` : zTerm(c1, x);
+    const right = zTerm(c2, y);
+    if (c2.isNegative()) return `${left} − ${right}`;
+    return `${left} + ${right}`;
+  }
+
+  function zSum(a, b) {
+    if (b.isZero()) return `${fmt(a)} + 0`;
+    if (b.isNegative()) return `${fmt(a)} − ${fmt(b.abs())}`;
+    return `${fmt(a)} + ${fmt(b)}`;
+  }
+
+  function zChain(c1, c2, x, y, z) {
+    const plugged = zPlug(c1, c2, x, y);
+    const added = zSum(c1.mul(x), c2.mul(y));
+    if (added === plugged || added === fmt(z)) return `Z = ${plugged} = ${fmt(z)}`;
+    return `Z = ${plugged} = ${added} = ${fmt(z)}`;
+  }
+
+  function renderZ(v, c1, c2, isBest) {
+    const card = el('article', { className: isBest ? 'z-card is-best' : 'z-card' });
+    card.append(el('p', { className: 'z-kicker', text: `Vértice ${v.letter}: ${point(fmt, v.x, v.y)}` }));
+    const plugged = zPlug(c1, c2, v.x, v.y);
+    const added = zSum(c1.mul(v.x), c2.mul(v.y));
+    card.append(alg(`Z = ${plugged}`));
+    if (added !== plugged) card.append(alg(`Z = ${added}`));
+    card.append(alg(`Z = ${fmt(v.z)}`, isBest ? 'answer' : ''));
+    return card;
+  }
+
+  function verifyBlock(eqs, x, y) {
+    const box = el('div', { className: 'g-eqs' });
+    eqs.forEach((eq) => {
+      const expr = joinTerms([
+        pluggedTerm(eq.a, 'x₁', true, x),
+        pluggedTerm(eq.b, 'x₂', true, y),
+      ]);
+      const sum = eq.a.mul(x).add(eq.b.mul(y));
+      const ok = sum.equals(eq.c);
+      box.append(note(`${eq.label}: se reemplazan x₁ y x₂.`));
+      box.append(alg(`${expr} = ${fmt(eq.c)}`));
+      box.append(alg(
+        ok ? `${fmt(sum)} = ${fmt(eq.c)}. Cumple.` : `El lado izquierdo da ${fmt(sum)}, y la ecuación pide ${fmt(eq.c)}.`,
+        ok ? 'ok' : 'bad',
+      ));
+    });
+    return box;
+  }
+
   function renderReduction(solved) {
     const card = el('article', { className: 'reduce-card' });
     card.append(el('p', { className: 'reduce-kicker', text: `${solved.labels[0]} con ${solved.labels[1]}` }));
     if (solved.kind === 'parallel') {
-      card.append(el('p', { className: 'beat-text', text: 'Estas dos rectas no se cruzan en un punto: son paralelas o son la misma recta. No definen un vértice.' }));
-      solved.eqs.forEach((eq) => card.append(el('p', { className: 'g-eq', text: `${eq.label}: ${eqText(fmt, eq.a, eq.b, eq.c)}` })));
+      card.append(note('Estas dos rectas no se cruzan en un punto: son paralelas o son la misma recta. No definen un vértice.'));
+      solved.eqs.forEach((eq) => card.append(alg(`${eq.label}:  ${eqText(fmt, eq.a, eq.b, eq.c)}`)));
       return card;
     }
 
     const steps = el('div', { className: 'reduce-steps' });
     const eqs = el('div', { className: 'g-eqs' });
-    solved.eqs.forEach((eq) => eqs.append(el('p', { className: 'g-eq', text: `${eq.label}:  ${eqText(fmt, eq.a, eq.b, eq.c)}` })));
-    steps.append(reduceStep(1, 'Las dos rectas', [eqs]));
+    solved.eqs.forEach((eq) => eqs.append(alg(`${eq.label}:  ${eqText(fmt, eq.a, eq.b, eq.c)}`)));
+    steps.append(reduceStep(1, 'Las dos rectas', [
+      note('El cruce se busca con las igualdades, aunque la restricción original sea ≤ o ≥.'),
+      eqs,
+    ]));
 
     if (solved.kind === 'direct') {
       const x = solved.point.x;
       const y = solved.point.y;
       steps.append(reduceStep(2, 'Cada recta ya da una variable', [
-        el('p', {
-          className: 'beat-text',
-          text: `${solved.vertical.label} es vertical: x₁ = ${fmt(solved.vertical.c)} ÷ ${fmt(solved.vertical.a)} = ${fmt(x)}. ${solved.horizontal.label} es horizontal: x₂ = ${fmt(solved.horizontal.c)} ÷ ${fmt(solved.horizontal.b)} = ${fmt(y)}.`,
-        }),
+        note(`${solved.vertical.label} es vertical: no tiene x₂.`),
+        alg(`x₁ = ${fmt(solved.vertical.c)} ÷ ${fmt(solved.vertical.a)} = ${fmt(x)}`, 'answer'),
+        note(`${solved.horizontal.label} es horizontal: no tiene x₁.`),
+        alg(`x₂ = ${fmt(solved.horizontal.c)} ÷ ${fmt(solved.horizontal.b)} = ${fmt(y)}`, 'answer'),
+      ]));
+      steps.append(reduceStep(3, 'Comprobar en las dos rectas', [
+        note('Se vuelven a colocar los dos valores en cada ecuación. Los dos lados deben coincidir.'),
+        verifyBlock(solved.eqs, x, y),
       ]));
     } else {
       const varName = solved.eliminate === 1 ? 'x₂' : 'x₁';
       const other = solved.eliminate === 1 ? 'x₁' : 'x₂';
       const [m1, m2] = solved.factors;
-      const already = m1.equals(Fraction.one()) && m2.equals(Fraction.one());
-      const scaled = el('div', { className: 'g-eqs' });
-      if (!already) {
-        solved.scaled.forEach((eq, i) => {
-          scaled.append(el('p', { className: 'g-eq', text: `${fmt(solved.factors[i])} · ${solved.labels[i]}:  ${eqText(fmt, eq.a, eq.b, eq.c)}` }));
+      const [e1, e2] = solved.eqs;
+      const [s1, s2] = solved.scaled;
+      const coef = (eq) => (solved.eliminate === 1 ? eq.b : eq.a);
+      const multiplyNodes = [
+        note(`En ${e1.label} el coeficiente de ${varName} es ${fmt(coef(e1))}. En ${e2.label} es ${fmt(coef(e2))}.`),
+      ];
+      if (m1.equals(Fraction.one()) && m2.equals(Fraction.one())) {
+        multiplyNodes.push(note(`Ya son iguales. No hace falta multiplicar.`));
+        multiplyNodes.push(alg(`${eqText(fmt, s1.a, s1.b, s1.c)}`));
+        multiplyNodes.push(alg(`${eqText(fmt, s2.a, s2.b, s2.c)}`));
+      } else {
+        [[e1, s1, m1], [e2, s2, m2]].forEach(([src, scaled, factor]) => {
+          if (factor.equals(Fraction.one())) {
+            multiplyNodes.push(note(`${src.label} se deja igual, porque su coeficiente de ${varName} ya sirve.`));
+            multiplyNodes.push(alg(eqText(fmt, scaled.a, scaled.b, scaled.c)));
+          } else {
+            multiplyNodes.push(note(`${src.label} se multiplica por ${fmt(factor)}, para que ${varName} quede con el mismo coeficiente en las dos.`));
+            multiplyNodes.push(alg(`${fmt(factor)}(${eqText(fmt, src.a, src.b, src.c)})`));
+            multiplyNodes.push(alg(eqText(fmt, scaled.a, scaled.b, scaled.c), 'answer'));
+          }
         });
       }
-      steps.append(reduceStep(2, `Igualar ${varName}`, [
-        el('p', {
-          className: 'beat-text',
-          text: already
-            ? `Los coeficientes de ${varName} ya son iguales. No hace falta multiplicar.`
-            : `${solved.labels[0]} se multiplica por ${fmt(m1)} y ${solved.labels[1]} por ${fmt(m2)}.`,
-        }),
-        ...(already ? [] : [scaled]),
+      steps.append(reduceStep(2, `Igualar ${varName}`, multiplyNodes));
+
+      const sign = solved.combine === 'add' ? '+' : '−';
+      const rhsOp = solved.combine === 'add'
+        ? `${fmt(s1.c)} + ${fmt(s2.c)}`
+        : `${fmt(s1.c)} − ${fmt(s2.c)}`;
+      const flip = (coef) => (solved.combine === 'add' ? coef : coef.neg());
+      const expanded = `${joinTerms([
+        plainTerm(s1.a, 'x₁'),
+        plainTerm(s1.b, 'x₂'),
+        plainTerm(flip(s2.a), 'x₁'),
+        plainTerm(flip(s2.b), 'x₂'),
+      ])} = ${fmt(solved.combine === 'add' ? s1.c.add(s2.c) : s1.c.sub(s2.c))}`;
+      const leftCoef = solved.eliminate === 1 ? solved.reduced.a : solved.reduced.b;
+      const divide = leftCoef.equals(Fraction.one())
+        ? `${other} = ${fmt(solved.firstValue)}`
+        : `${other} = ${fmt(solved.reduced.c)} ÷ ${fmt(leftCoef)} = ${fmt(solved.firstValue)}`;
+      steps.append(reduceStep(3, solved.combine === 'add' ? 'Sumar y despejar' : 'Restar y despejar', [
+        note(solved.combine === 'add'
+          ? `Los coeficientes de ${varName} tienen signo contrario. Se suman las dos ecuaciones y ${varName} desaparece.`
+          : `Ahora las dos tienen el mismo ${varName}. Se resta la segunda de la primera y ${varName} desaparece.`),
+        alg(`(${lin(fmt, s1.a, s1.b)}) ${sign} (${lin(fmt, s2.a, s2.b)}) = ${rhsOp}`),
+        note('Se quitan los paréntesis y se juntan los términos parecidos.'),
+        alg(expanded),
+        alg(eqText(fmt, solved.reduced.a, solved.reduced.b, solved.reduced.c), leftCoef.equals(Fraction.one()) ? 'answer' : ''),
+        ...(leftCoef.isNegative() ? [note('El número salió negativo. Se divide igual: negativo entre negativo da positivo.')] : []),
+        ...(leftCoef.equals(Fraction.one()) ? [] : [alg(divide, 'answer')]),
       ]));
-      const reduced = el('div', { className: 'g-eqs' });
-      reduced.append(el('p', { className: 'g-eq', text: eqText(fmt, solved.reduced.a, solved.reduced.b, solved.reduced.c) }));
-      reduced.append(el('p', { className: 'g-eq is-answer', text: `${other} = ${fmt(solved.firstValue)}` }));
-      steps.append(reduceStep(3, solved.combine === 'add' ? 'Sumar las ecuaciones' : 'Restar las ecuaciones', [
-        el('p', {
-          className: 'beat-text',
-          text: solved.combine === 'add'
-            ? `Los coeficientes de ${varName} tienen signo contrario. Al sumar, ${varName} se anula.`
-            : `Se resta la segunda de la primera. ${varName} se anula.`,
-        }),
-        reduced,
-      ]));
+
       const host = solved.host;
-      const knownCoef = solved.firstIndex === 0 ? host.a : host.b;
-      const otherCoef = solved.firstIndex === 0 ? host.b : host.a;
       const knownName = solved.firstIndex === 0 ? 'x₁' : 'x₂';
       const otherName = solved.firstIndex === 0 ? 'x₂' : 'x₁';
+      const knownCoef = solved.firstIndex === 0 ? host.a : host.b;
+      const otherCoef = solved.firstIndex === 0 ? host.b : host.a;
+      const knownValue = solved.firstValue;
       const found = solved.point[otherName === 'x₁' ? 'x' : 'y'];
-      steps.append(reduceStep(4, `Sustituir en ${host.label}`, [
-        el('p', {
-          className: 'beat-text',
-          text: `${fmt(otherCoef)} ${otherName} = ${fmt(host.c)} − (${fmt(knownCoef)})·(${fmt(solved.firstValue)}) = ${fmt(solved.moved)}.`,
-        }),
-        el('p', { className: 'g-eq is-answer', text: `${otherName} = ${fmt(found)}` }),
+      const product = knownCoef.mul(knownValue);
+      const productShown = product.isNegative() ? `(${fmt(product)})` : fmt(product);
+      const aside = `${fmt(host.c)} − ${productShown}`;
+      const otherLeft = otherCoef.equals(Fraction.one())
+        ? otherName
+        : (otherCoef.equals(Fraction.one().neg()) ? `−${otherName}` : `${fmt(otherCoef)}${otherName}`);
+      const pluggedLine = joinTerms([
+        pluggedTerm(host.a, 'x₁', solved.firstIndex === 0, knownValue),
+        pluggedTerm(host.b, 'x₂', solved.firstIndex === 1, knownValue),
+      ]) + ` = ${fmt(host.c)}`;
+      const replacedLine = joinTerms([
+        replacedTerm(host.a, 'x₁', solved.firstIndex === 0, knownValue),
+        replacedTerm(host.b, 'x₂', solved.firstIndex === 1, knownValue),
+      ]) + ` = ${fmt(host.c)}`;
+      const subNodes = [
+        note(`Ya se conoce ${knownName} = ${fmt(knownValue)}. Se pone ese valor en ${host.label}, que es una de las ecuaciones originales.`),
+        alg(eqText(fmt, host.a, host.b, host.c)),
+        alg(pluggedLine),
+      ];
+      if (replacedLine !== pluggedLine) subNodes.push(alg(replacedLine));
+      if (otherCoef.equals(Fraction.one())) {
+        subNodes.push(alg(`${otherName} = ${aside} = ${fmt(found)}`, 'answer'));
+      } else {
+        subNodes.push(note('El número que ya se calculó pasa al otro lado y cambia de signo.'));
+        subNodes.push(alg(`${otherLeft} = ${aside}`));
+        if (fmt(solved.moved) !== aside) subNodes.push(alg(`${otherLeft} = ${fmt(solved.moved)}`));
+        subNodes.push(alg(`${otherName} = ${fmt(solved.moved)} ÷ ${fmt(otherCoef)} = ${fmt(found)}`, 'answer'));
+      }
+      steps.append(reduceStep(4, `Sustituir para hallar ${otherName}`, subNodes));
+      steps.append(reduceStep(5, 'Comprobar en las dos rectas', [
+        note('Se reemplazan los dos valores en cada ecuación. Si los dos lados coinciden, el cruce está bien calculado.'),
+        verifyBlock(solved.eqs, solved.point.x, solved.point.y),
       ]));
     }
     card.append(steps);
@@ -408,21 +568,23 @@ export function mountGraphic({ getMode, setMode }) {
     walk.append(verts.row);
 
     if (result.vertices.length) {
-      const evalBeat = beat(5, 'Evaluación', 'Z en cada vértice', `Z = ${lin(fmt, result.objective[0], result.objective[1])}. Se calcula en cada vértice y se ${result.sense === 'min' ? 'elige el menor' : 'elige el mayor'}.`);
-      const table = el('table', { className: 'z-eval' });
-      const head = el('thead');
-      const hr = el('tr');
-      ['Vértice', 'x₁', 'x₂', 'Z'].forEach((name) => hr.append(el('th', { text: name })));
-      head.append(hr);
-      table.append(head);
-      const body = el('tbody');
+      const c1 = result.objective[0];
+      const c2 = result.objective[1];
+      const pick = result.sense === 'min' ? 'menor' : 'mayor';
+      const evalBeat = beat(5, 'Evaluación', 'Z en cada vértice', `Z = ${lin(fmt, c1, c2)}. En cada vértice se reemplazan x₁ y x₂. Primero se multiplica y después se suma. El óptimo es el valor ${pick}.`);
       result.vertices.forEach((v) => {
-        const tr = el('tr', { className: result.best.includes(v) ? 'is-best' : '' });
-        [v.letter, fmt(v.x), fmt(v.y), fmt(v.z)].forEach((value) => tr.append(el('td', { text: value })));
-        body.append(tr);
+        const isBest = result.best.includes(v) && result.status !== 'unbounded';
+        evalBeat.card.append(renderZ(v, c1, c2, isBest));
       });
-      table.append(body);
-      evalBeat.card.append(table);
+      if (result.status !== 'unbounded' && result.best.length) {
+        const names = result.best.map((v) => `${v.letter} ${point(fmt, v.x, v.y)}`).join(' y ');
+        evalBeat.card.append(el('p', {
+          className: 'reduce-point is-ok',
+          text: result.best.length > 1
+            ? `Empatan en Z = ${fmt(result.bestZ)}: ${names}. Esos vértices son óptimos.`
+            : `El ${pick} es Z = ${fmt(result.bestZ)}, en ${names}. Por eso ese vértice es el óptimo.`,
+        }));
+      }
       walk.append(evalBeat.row);
     }
 
@@ -449,8 +611,9 @@ export function mountGraphic({ getMode, setMode }) {
     } else {
       done.classList.add('is-done');
       const v = result.best[0];
+      const pick = result.sense === 'min' ? 'menor' : 'mayor';
       title = result.sense === 'min' ? 'Este es el mínimo' : 'Este es el máximo';
-      text = `${v.letter} = ${point(fmt, v.x, v.y)} y Z = ${fmt(v.z)}.`;
+      text = `${v.letter} ${point(fmt, v.x, v.y)}: ${zChain(result.objective[0], result.objective[1], v.x, v.y, v.z)}. Es el ${pick}, así que es el óptimo.`;
       if (result.regionUnbounded) text += ' La región sigue abierta, pero Z no mejora al alejarse de este punto.';
       if (result.active.length) text += ` Pasan por el óptimo: ${result.active.join(', ')}.`;
       if (result.inactive.length) text += ` No pasan por el óptimo: ${result.inactive.join(', ')}.`;
@@ -476,8 +639,18 @@ export function mountGraphic({ getMode, setMode }) {
     graphCard.append(wrap);
     const legend = el('ul', { className: 'graph-legend' });
     result.vertices.forEach((v) => {
-      const mark = result.best.includes(v) && result.status !== 'unbounded' ? ' · óptimo' : '';
-      legend.append(el('li', { text: `${v.letter} = ${point(fmt, v.x, v.y)}, Z = ${fmt(v.z)}${mark}` }));
+      const best = result.best.includes(v) && result.status !== 'unbounded';
+      const li = el('li', { className: best ? 'is-best' : '' });
+      li.append(el('p', {
+        className: 'z-legend-title',
+        text: `${v.letter} ${point(fmt, v.x, v.y)}${best ? ' · óptimo' : ''}`,
+      }));
+      const plugged = zPlug(result.objective[0], result.objective[1], v.x, v.y);
+      const added = zSum(result.objective[0].mul(v.x), result.objective[1].mul(v.y));
+      li.append(el('p', { className: 'z-line', text: `Z = ${plugged}` }));
+      if (added !== plugged) li.append(el('p', { className: 'z-line', text: `Z = ${added}` }));
+      li.append(el('p', { className: best ? 'z-line is-answer' : 'z-line', text: `Z = ${fmt(v.z)}` }));
+      legend.append(li);
     });
     if (legend.childNodes.length) graphCard.append(legend);
     root.append(graphCard);

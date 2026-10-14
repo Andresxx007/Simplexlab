@@ -2689,7 +2689,29 @@ main { position:relative; z-index:1; }
 .reduce-point.is-no { background: var(--s1); color: var(--t2); }
 .reduce-kicker-gap { margin-top: 1rem; }
 .g-eqs { display: flex; flex-direction: column; gap: .15rem; margin-top: .25rem; }
-.g-eq.is-answer { color: var(--t1); font-weight: 700; }
+.alg {
+  margin: .28rem 0;
+  text-align: center;
+  font-family: var(--fm);
+  color: var(--t1);
+  line-height: 1.5;
+}
+.alg.is-answer,
+.alg.is-ok {
+  font-weight: 700;
+  background: var(--enter-subtle);
+  color: var(--enter-hi);
+  border-radius: 8px;
+  padding: .4rem .55rem;
+}
+.alg.is-bad {
+  font-weight: 700;
+  background: var(--s1);
+  color: var(--t1);
+  border-radius: 8px;
+  padding: .4rem .55rem;
+  border: 1px solid var(--b1);
+}
 .reduce-steps { display: flex; flex-direction: column; gap: .65rem; margin-top: .35rem; }
 .reduce-step { display: grid; grid-template-columns: 1.7rem minmax(0, 1fr); gap: .15rem .55rem; align-items: start; }
 .reduce-num {
@@ -2748,6 +2770,16 @@ main { position:relative; z-index:1; }
   border-radius: 999px;
   padding: .35rem .7rem;
 }
+.z-card {
+  margin-top: .75rem;
+  padding: .55rem .7rem .2rem;
+  background: var(--s1);
+  border: 1px solid var(--b1);
+  border-radius: var(--r2);
+}
+.z-card.is-best { border-color: var(--enter-hi); background: var(--s2); }
+.z-kicker { margin: 0; font-weight: 700; color: var(--t1); }
+.graph-legend li.is-best { color: var(--enter-hi); font-weight: 700; }
 .z-eval {
   width: 100%;
   margin-top: .75rem;
@@ -2774,7 +2806,10 @@ main { position:relative; z-index:1; }
   padding-left: 1.1rem;
   color: var(--t2);
 }
-.graph-legend li { margin: 0 0 .3rem; font-family: var(--fm); }
+.graph-legend li { margin: 0 0 .75rem; color: var(--t1); }
+.z-legend-title { margin: 0; font-weight: 700; }
+.z-line { margin: 0; font-family: var(--fm); line-height: 1.45; }
+.z-line.is-answer { font-weight: 700; }
 @media (max-width: 760px) {
   .z-eval th, .z-eval td { padding: .42rem .35rem; font-size: .82rem; }
   .vertex-board th, .vertex-board td { padding: .4rem .3rem; font-size: .82rem; }

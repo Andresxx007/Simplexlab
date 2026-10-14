@@ -10,8 +10,8 @@ import { EXAMPLES } from './examples.js';
 import {
   loadHistory, saveHistoryItem, removeHistoryItem, clearHistory, storageAvailable,
 } from './storage.js';
-import { startHeroCanvas, startDemoCanvas } from './motion.js?v=4';
-import { mountGraphic } from './graphic-ui.js?v=4';
+import { startHeroCanvas, startDemoCanvas } from './motion.js?v=5';
+import { mountGraphic } from './graphic-ui.js?v=5';
 
 const SUB = ['', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉', '₁₀'];
 
